@@ -1,17 +1,17 @@
-=== HyperDB ===
-Contributors: matt, andy, ryan, mdawaffe, vnsavage, automattic
-Tags: mysql, scaling, performance, availability, WordPress.com
-Requires at least: 2.3
-Tested up to: 4.0
-Stable tag: trunk
+=== LudicrousDB ===
+Contributors: matt, andy, ryan, mdawaffe, vnsavage, automattic, johnjamesjacoby
+Tags: mysql, scaling, performance, availability
+Requires at least: 4.2
+Tested up to: 4.3
+Stable tag: 2.0.0
 
-HyperDB is an advanced database class that supports replication, failover, load balancing, and partitioning.
+LudicrousDB is a database class that supports replication, failover, load balancing, and partitioning, based on Automattic's HyperDB.
 
 == Description ==
 
-HyperDB is a very advanced database class that replaces a few of the WordPress built-in database functions. The main differences are:
-* HyperDB can be connect to an arbitrary number of database servers,
-* HyperDB inspects each query to determine the appropriate database.
+LudicrousDB is a very advanced database class that replaces a few of the WordPress built-in database functions. The main differences are:
+* LudicrousDB can be connect to an arbitrary number of database servers,
+* LudicrousDB inspects each query to determine the appropriate database.
 
 It supports:
 
@@ -24,7 +24,7 @@ It supports:
 * Failover for downed host
 * Advanced statistics for profiling
 
-It is based on the code currently used in production on WordPress.com with many MySQL servers spanning multiple datacenters.
+It is based on the code currently used in production on WordPress.org with many MySQL servers spanning multiple datacenters.
 
 == Installation ==
 
@@ -36,43 +36,50 @@ Nothing goes in the plugins directory.
 
 3. Deploy `db.php` to the `/wp-content/` directory. Simply placing this file activates it. To deactivate it, move it from that location or move the config file.
 
-Any value of `WP_USE_MULTIPLE_DB` will be ignored by HyperDB.
+4. Optional - deploy `db-error.php` to the `/wp-content/` directory. This file is used when database connections critically fail.
+
+Any value of `WP_USE_MULTIPLE_DB` will be ignored by LudicrousDB.
 
 == Frequently Asked Questions ==
 
-= What can I do with HyperDB that I can't do with WPDB? =
+= What can I do with LudicrousDB that I can't do with WPDB? =
 
-WordPress.com, the most complex HyperDB installation, manages millions of tables spanning thousands of databases. Dynamic configuration logic allows HyperDB to compute the location of tables by querying a central database. Custom scripts constantly balance database server resources by migrating tables and updating their locations in the central database.
+WordPress.org, the most complex LudicrousDB installation, manages millions of tables spanning thousands of databases. Dynamic configuration logic allows LudicrousDB to compute the location of tables by querying a central database. Custom scripts constantly balance database server resources by migrating tables and updating their locations in the central database.
 
 Stretch your imagination. You could create a dynamic configuration using persistent caching to gather intelligence about the state of the network. The only constant is the name of the configuration file. The rest, as they say, is PHP.
 
-= How does HyperDB support replication? =
+= How does LudicrousDB support replication? =
 
-HyperDB does not provide replication services. That is done by configuring MySQL servers for replication. HyperDB can then be configured to use these servers appropriately, e.g. by connecting to master servers to perform write queries.
+LudicrousDB does not provide replication services. That is done by configuring MySQL servers for replication. LudicrousDB can then be configured to use these servers appropriately, e.g. by connecting to master servers to perform write queries.
 
-= How does HyperDB support load balancing? =
+= How does LudicrousDB support load balancing? =
 
-HyperDB randomly selects database connections from priority groups that you configure. The most advantageous connections are tried first. Thus you can optimize your configuration for network topology, hardware capability, or any other scheme you invent.
+LudicrousDB randomly selects database connections from priority groups that you configure. The most advantageous connections are tried first. Thus you can optimize your configuration for network topology, hardware capability, or any other scheme you invent.
 
-= How does HyperDB support failover? =
+= How does LudicrousDB support failover? =
 
-Failover describes how HyperDB deals with connection failures. When HyperDB fails to connect to one database, it tries to connect to another database that holds the same data. If replication hasn't been set up, HyperDB tries reconnecting a few times before giving up.
+Failover describes how LudicrousDB deals with connection failures. When LudicrousDB fails to connect to one database, it tries to connect to another database that holds the same data. If replication hasn't been set up, LudicrousDB tries reconnecting a few times before giving up.
 
-= How does HyperDB support partitioning? =
+= How does LudicrousDB support partitioning? =
 
-HyperDB allows tables to be placed in arbitrary databases. It can use callbacks you write to compute the appropriate database for a given query. Thus you can partition your site's data according to your own scheme and configure HyperDB accordingly.
+LudicrousDB allows tables to be placed in arbitrary databases. It can use callbacks you write to compute the appropriate database for a given query. Thus you can partition your site's data according to your own scheme and configure LudicrousDB accordingly.
 
-= Is there any advantage to using HyperDB with just one database server? =
+= Is there any advantage to using LudicrousDB with just one database server? =
 
-None that has been measured. HyperDB does at least try again before giving up connecting, so it might help in cases where the web server is momentarily unable to connect to the database server.
+None that has been measured. LudicrousDB does at least try again before giving up connecting, so it might help in cases where the web server is momentarily unable to connect to the database server.
 
-One way HyperDB differs from WPDB is that HyperDB does not attempt to connect to a database until a query is made. Thus a site with sufficiently aggressive persistent caching could remain read-only accessible despite the database becoming unreachable.
+One way LudicrousDB differs from WPDB is that LudicrousDB does not attempt to connect to a database until a query is made. Thus a site with sufficiently aggressive persistent caching could remain read-only accessible despite the database becoming unreachable.
 
 = What if all database servers for a dataset go down? =
 
-Since HyperDB attempts a connection only when a query is made, your WordPress installation will not kill the site with a database error, but will let the code decide what to do next on an unsuccessful query. If you want to do something different, like setting a custom error page or kill the site, you need to define the 'db_connection_error' callback in your db-config.php.
+Since LudicrousDB attempts a connection only when a query is made, your WordPress installation will not kill the site with a database error, but will let the code decide what to do next on an unsuccessful query. If you want to do something different, like setting a custom error page or kill the site, you need to define the 'db_connection_error' callback in your db-config.php.
 
 == Changelog ==
+
+= 2.0 =
+* Fork from HyperDB
+* Include utf8mb4 support (for WordPress 4.2 compatibility)
+* Remove support for WPDB_PATH as require_wp_db() prevents it
 
 = 1.1 =
 * Extended callbacks functionality
