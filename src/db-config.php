@@ -1,19 +1,19 @@
 <?php
 
 /**
- * HyperDB configuration file
+ * LudicrousDB configuration file
  *
  * This file should be installed at ABSPATH/db-config.php
  *
- * $wpdb is an instance of the hyperdb class which extends the wpdb class.
+ * $wpdb is an instance of the LudicrousDB class which extends the wpdb class.
  *
  * See readme.txt for documentation.
  */
 
 /**
- * Introduction to HyperDB configuration
+ * Introduction to LudicrousDB configuration
  *
- * HyperDB can manage connections to a large number of databases. Queries are
+ * LudicrousDB can manage connections to a large number of databases. Queries are
  * distributed to appropriate servers by mapping table names to datasets.
  *
  * A dataset is defined as a group of tables that are located in the same
@@ -22,7 +22,7 @@
  * on different servers. The term "dataset" removes any ambiguity. Consider a
  * dataset as a group of tables that can be mirrored on many servers.
  *
- * Configuring HyperDB involves defining databases and datasets. Defining a
+ * Configuring LudicrousDB involves defining databases and datasets. Defining a
  * database involves specifying the server connection details, the dataset it
  * contains, and its capabilities and priorities for reading and writing.
  * Defining a dataset involves specifying its exact table names or registering
@@ -77,13 +77,13 @@ $wpdb->check_tcp_responsiveness = true;
  * password      (required) MySQL user password.
  * name          (required) MySQL database name.
  * read          (optional) Whether server is readable. Default is 1 (readable).
- *						   Also used to assign preference. See "Network topology".
+ *                          Also used to assign preference. See "Network topology".
  * write         (optional) Whether server is writable. Default is 1 (writable).
  *                          Also used to assign preference in multi-master mode.
  * dataset       (optional) Name of dataset. Default is 'global'.
  * timeout       (optional) Seconds to wait for TCP responsiveness. Default is 0.2
  * lag_threshold (optional) The minimum lag on a slave in seconds before we consider it lagged. 
- *							Set null to disable. When not set, the value of $wpdb->default_lag_threshold is used.
+ *                          Set null to disable. When not set, the value of $wpdb->default_lag_threshold is used.
  */
 
 /**
@@ -108,8 +108,8 @@ $wpdb->check_tcp_responsiveness = true;
  * Anything evaluating to false will cause the query to be aborted.
  *
  * For more complex setups, the callback may be used to overwrite properties of
- * $wpdb or variables within hyperdb::connect_db(). If a callback returns an
- * array, HyperDB will extract the array. It should be an associative array and
+ * $wpdb or variables within LudicrousDB::connect_db(). If a callback returns an
+ * array, LudicrousDB will extract the array. It should be an associative array and
  * it should include a $dataset value corresponding to a database added with
  * $wpdb->add_database(). It may also include $server, which will be extracted
  * to overwrite the parameters of each randomly selected database server prior
@@ -134,7 +134,7 @@ $wpdb->check_tcp_responsiveness = true;
  * there are many slaves available and the master is very busy with writes.
  *   'write' => 1,
  *   'read'  => 0,
- * HyperDB tracks the tables that it has written since instantiation and sending 
+ * LudicrousDB tracks the tables that it has written since instantiation and sending 
  * subsequent read queries to the same server that received the write query. 
  * Thus a master set up this way will still receive read queries, but only 
  * subsequent to writes.
@@ -150,7 +150,7 @@ $wpdb->check_tcp_responsiveness = true;
  * logical groups of more or less preferred connections. Lower numbers indicate
  * greater preference.
  *
- * This configuration instructs HyperDB to try reading from one of the local
+ * This configuration instructs LudicrousDB to try reading from one of the local
  * slaves at random. If that slave is unreachable or refuses the connection,
  * the other slave will be tried, followed by the master, and finally the
  * remote slaves in random order.
@@ -179,7 +179,7 @@ $wpdb->check_tcp_responsiveness = true;
 /**
  * Slaves lag awareness 
  *
- * HyperDB accommodates slave lag by making decisions, based on the defined lag 
+ * LudicrousDB accommodates slave lag by making decisions, based on the defined lag 
  * threshold. If the lag threshold is not set, it will ignore the slave lag.
  * Otherwise, it will try to find a non-lagged slave, before connecting to a lagged one.
  *
@@ -188,7 +188,7 @@ $wpdb->check_tcp_responsiveness = true;
  * add_database(). You can also rewrite the lag threshold, by returning 
  * $server['lag_threshold'] variable with the 'dataset' group callbacks.
  *
- * HyperDB does not check the lag on the slaves. You have to define two callbacks 
+ * LudicrousDB does not check the lag on the slaves. You have to define two callbacks 
  * callbacks to do that:
  *
  * $wpdb->add_callback( $callback, 'get_lag_cache' );
@@ -209,7 +209,7 @@ $wpdb->check_tcp_responsiveness = true;
 /** NOTE: THIS IS ACTIVE BY DEFAULT. COMMENT IT OUT. **/
 
 /**
- * This is the most basic way to add a server to HyperDB using only the
+ * This is the most basic way to add a server to LudicrousDB using only the
  * required parameters: host, user, password, name.
  * This adds the DB defined in wp-config.php as a read/write server for
  * the 'global' dataset. (Every table is in 'global' by default.)
@@ -265,29 +265,29 @@ function my_db_callback($query, $wpdb) {
 */
 
 
-/** Sample helper functions from WordPress.com **/
+// Sample helper functions from WordPress.com & HyperDB
 
 /**
  * This is back-compatible with an older config style. It is for convenience.
- * lhost, part, and dc were removed from hyperdb because the read and write
+ * lhost, part, and dc were removed from LudicrousDB because the read and write
  * parameters provide enough power to achieve the desired effects via config.
  *
- * @param string $dataset Datset: the name of the dataset. Just use "global" if you don't need horizontal partitioning.
- * @param int $part Partition: the vertical partition number (1, 2, 3, etc.). Use "0" if you don't need vertical partitioning.
- * @param string $dc Datacenter: where the database server is located. Airport codes are convenient. Use whatever.
- * @param int $read Read group: tries all servers in lowest number group before trying higher number group. Typical: 1 for slaves, 2 for master. This will cause reads to go to slaves unless all slaves are unreachable. Zero for no reads.
- * @param bool $write Write flag: is this server writable? Works the same as $read. Typical: 1 for master, 0 for slaves.
- * @param string $host Internet address: host:port of server on internet. 
- * @param string $lhost Local address: host:port of server for use when in same datacenter. Leave empty if no local address exists.
- * @param string $name Database name.
- * @param string $user Database user.
+ * @param string $dataset  Datset: the name of the dataset. Just use "global" if you don't need horizontal partitioning.
+ * @param int    $part     Partition: the vertical partition number (1, 2, 3, etc.). Use "0" if you don't need vertical partitioning.
+ * @param string $dc       Datacenter: where the database server is located. Airport codes are convenient. Use whatever.
+ * @param int    $read     Read group: tries all servers in lowest number group before trying higher number group. Typical: 1 for slaves, 2 for master. This will cause reads to go to slaves unless all slaves are unreachable. Zero for no reads.
+ * @param bool   $write    Write flag: is this server writable? Works the same as $read. Typical: 1 for master, 0 for slaves.
+ * @param string $host     Internet address: host:port of server on internet. 
+ * @param string $lhost    Local address: host:port of server for use when in same datacenter. Leave empty if no local address exists.
+ * @param string $name     Database name.
+ * @param string $user     Database user.
  * @param string $password Database password.
  */
 /*
 function add_db_server($dataset, $part, $dc, $read, $write, $host, $lhost, $name, $user, $password, $timeout = 0.2 ) {
 	global $wpdb;
 
-	// dc is not used in hyperdb. This produces the desired effect of
+	// dc is not used in LudicrousDB. This produces the desired effect of
 	// trying to connect to local servers before remote servers. Also
 	// increases time allowed for TCP responsiveness check.
 	if ( !empty($dc) && defined(DATACENTER) && $dc != DATACENTER ) {
@@ -298,7 +298,7 @@ function add_db_server($dataset, $part, $dc, $read, $write, $host, $lhost, $name
 		$timeout = 0.7;
 	}
 
-	// You'll need a hyperdb::add_callback() callback function to use partitioning.
+	// You'll need a LudicrousDB::add_callback() callback function to use partitioning.
 	// $wpdb->add_callback( 'my_func' );
 	if ( $part )
 		$dataset = $dataset . '_' . $part;
@@ -307,7 +307,7 @@ function add_db_server($dataset, $part, $dc, $read, $write, $host, $lhost, $name
 
 	$wpdb->add_database($database);
 
-	// lhost is not used in hyperdb. This configures hyperdb with an
+	// lhost is not used in LudicrousDB. This configures LudicrousDB with an
 	// additional server to represent the local hostname so it tries to
 	// connect over the private interface before the public one.
 	if ( !empty( $lhost ) ) {
@@ -385,6 +385,3 @@ function get_lag( $wpdb ) {
 }
 
 */
-
-// The ending PHP tag is omitted. This is actually safer than including it.
-

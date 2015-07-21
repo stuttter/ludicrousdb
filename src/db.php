@@ -1,14 +1,15 @@
 <?php
 
-// HyperDB
+/**
+ * Plugin name: LudicrousDB
+ * Author:      johnjamesjacoby
+ * Plugin URI:  https://github.com/johnjamesjacoby/ludicrousdb
+ * Description: An advanced database class that supports replication, failover, load balancing, and partitioning.
+ * Version:     2.0.0
+ */
 
-/** Load the wpdb class while preventing instantiation * */
-$wpdb = true;
-if ( defined( 'WPDB_PATH' ) ) {
-	require_once( WPDB_PATH );
-} else {
-	require_once( ABSPATH . WPINC . '/wp-db.php' );
-}
+// Exit if accessed directly
+defined( 'ABSPATH' ) || exit();
 
 // The config file was defined earlier.
 if ( defined( 'DB_CONFIG_FILE' ) && file_exists( DB_CONFIG_FILE ) ) {
@@ -20,7 +21,7 @@ if ( defined( 'DB_CONFIG_FILE' ) && file_exists( DB_CONFIG_FILE ) ) {
 
 // The config file resides one level above ABSPATH but is not part of
 // another install.
-} elseif ( file_exists( dirname( ABSPATH ) . '/db-config.php' ) && !file_exists( dirname( ABSPATH ) . '/wp-settings.php' ) ) {
+} elseif ( file_exists( dirname( ABSPATH ) . '/db-config.php' ) && ! file_exists( dirname( ABSPATH ) . '/wp-settings.php' ) ) {
 	define( 'DB_CONFIG_FILE', dirname( ABSPATH ) . '/db-config.php' );
 
 // Lacking a config file, revert to the standard database class.
@@ -32,18 +33,16 @@ if ( defined( 'DB_CONFIG_FILE' ) && file_exists( DB_CONFIG_FILE ) ) {
 /**
  * Add a database table
  *
- * @global object $wpdb
  * @param  string $dataset
  * @param  string $table
  */
-function hyperdb_add_db_table( $dataset, $table ) {
-	global $wpdb;
-	$wpdb->add_table( $dataset, $table );
+function ldb_add_db_table( $dataset, $table ) {
+	$GLOBALS['wpdb']->add_table( $dataset, $table );
 }
 
 /**
  * This is back-compatible with an older config style. It is for convenience.
- * lhost, part, and dc were removed from hyperdb because the read and write
+ * lhost, part, and dc were removed from LudicrousDB because the read and write
  * parameters provide enough power to achieve the desired effects via config.
  *
  * @param string $dataset  Datset:           the name of the dataset. Just use "global" if you don't need horizontal partitioning.
@@ -57,15 +56,9 @@ function hyperdb_add_db_table( $dataset, $table ) {
  * @param string $user     Database user.
  * @param string $password Database password.
  */
-function hyperdb_add_db_server( $dataset, $part, $dc, $read, $write, $host, $lhost, $name, $user, $password, $timeout = 0.2 ) {
-	global $wpdb, $_removed_db_servers;
+function ldb_add_db_server( $dataset, $part, $dc, $read, $write, $host, $lhost, $name, $user, $password, $timeout = 0.2 ) {
 
-	// Don't add if server is removed - WPORG
-	if ( in_array( $host, $_removed_db_servers ) ) {
-		return;
-	}
-
-	// dc is not used in hyperdb. This produces the desired effect of
+	// dc is not used in LudicrousDB. This produces the desired effect of
 	// trying to connect to local servers before remote servers. Also
 	// increases time allowed for TCP responsiveness check.
 	if ( ! empty( $dc ) && defined( DATACENTER ) && ( DATACENTER !== $dc ) ) {
@@ -80,10 +73,10 @@ function hyperdb_add_db_server( $dataset, $part, $dc, $read, $write, $host, $lho
 
 	$database = compact( 'dataset', 'read', 'write', 'host', 'name', 'user', 'password', 'timeout' );
 
-	$wpdb->add_database( $database );
+	$GLOBALS['wpdb']->add_database( $database );
 
 	if ( defined( 'DATACENTER' ) && $dc === DATACENTER ) {
-		// lhost is not used in hyperdb. This configures hyperdb with an
+		// lhost is not used in LudicrousDB. This configures LudicrousDB with an
 		// additional server to represent the local hostname so it tries to
 		// connect over the private interface before the public one.
 		if ( ! empty( $lhost ) ) {
@@ -98,7 +91,7 @@ function hyperdb_add_db_server( $dataset, $part, $dc, $read, $write, $host, $lho
 				$database[ 'write' ] = $write - 0.5;
 			}
 
-			$wpdb->add_database( $database );
+			$GLOBALS['wpdb']->add_database( $database );
 		}
 	}
 }
@@ -106,11 +99,11 @@ function hyperdb_add_db_server( $dataset, $part, $dc, $read, $write, $host, $lho
 /**
  * Common definitions
  */
-define( 'HYPERDB_LAG_OK',      1 );
-define( 'HYPERDB_LAG_BEHIND',  2 );
-define( 'HYPERDB_LAG_UNKNOWN', 3 );
+define( 'DB_LAG_OK',      1 );
+define( 'DB_LAG_BEHIND',  2 );
+define( 'DB_LAG_UNKNOWN', 3 );
 
-class hyperdb extends wpdb {
+class LudicrousDB extends wpdb {
 
 	/**
 	 * The last table that was queried
@@ -150,19 +143,19 @@ class hyperdb extends wpdb {
 	 * The multi-dimensional array of datasets and servers
 	 * @public array
 	 */
-	public $hyper_servers = array();
+	public $ludicrous_servers = array();
 
 	/**
 	 * Optional directory of tables and their datasets
 	 * @public array
 	 */
-	public $hyper_tables = array();
+	public $ludicrous_tables = array();
 
 	/**
 	 * Optional directory of callbacks to determine datasets from queries
 	 * @public array
 	 */
-	public $hyper_callbacks = array();
+	public $ludicrous_callbacks = array();
 
 	/**
 	 * Custom callback to save debug info in $this->queries
@@ -300,11 +293,11 @@ class hyperdb extends wpdb {
 		unset( $db['dataset'] );
 
 		if ( ! empty( $read ) ) {
-			$this->hyper_servers[ $dataset ]['read'][ $read ][] = $db;
+			$this->ludicrous_servers[ $dataset ]['read'][ $read ][] = $db;
 		}
 
 		if ( ! empty( $write ) ) {
-			$this->hyper_servers[ $dataset ]['write'][ $write ][] = $db;
+			$this->ludicrous_servers[ $dataset ]['write'][ $write ][] = $db;
 		}
 	}
 
@@ -312,7 +305,7 @@ class hyperdb extends wpdb {
 	 * Specify the dataset where a table is found
 	 */
 	public function add_table( $dataset, $table ) {
-		$this->hyper_tables[ $table ] = $dataset;
+		$this->ludicrous_tables[ $table ] = $dataset;
 	}
 
 	/**
@@ -321,68 +314,7 @@ class hyperdb extends wpdb {
 	 * queries and determine dataset.
 	 */
 	public function add_callback( $callback, $group = 'dataset' ) {
-		$this->hyper_callbacks[ $group ][] = $callback;
-	}
-
-	/**
-	 * Find the first table name referenced in a query
-	 * @param string query
-	 * @return string table
-	 */
-	public function get_table_from_query( $q ) {
-
-		// Remove characters that can legally trail the table name
-		$q = rtrim( $q, ';/-#' );
-
-		// allow (select...) union [...] style queries. Use the first queries table name.
-		$q = ltrim( $q, "\t (" );
-
-		// Refer to the previous query
-		if ( preg_match( '/^\s*SELECT.*?\s+FOUND_ROWS\(\)/is', $q ) ) {
-			return $this->last_table;
-		}
-
-		// Quickly match most common queries
-		if ( preg_match( '/^\s*(?:'
-				. 'SELECT.*?\s+FROM'
-				. '|INSERT(?:\s+IGNORE)?(?:\s+INTO)?'
-				. '|REPLACE(?:\s+INTO)?'
-				. '|UPDATE(?:\s+IGNORE)?'
-				. '|DELETE(?:\s+IGNORE)?(?:\s+FROM)?'
-				. ')\s+`?([\w-]+)`?/is', $q, $maybe ) ) {
-			return $maybe[1];
-		}
-
-		// SHOW TABLE STATUS and SHOW TABLES
-		if ( preg_match( '/^\s*(?:'
-				. 'SHOW\s+TABLE\s+STATUS.+(?:LIKE\s+|WHERE\s+Name\s*=\s*)'
-				. '|SHOW\s+(?:FULL\s+)?TABLES.+(?:LIKE\s+|WHERE\s+Name\s*=\s*)'
-				. ')\W([\w-]+)\W/is', $q, $maybe ) ) {
-			return $maybe[1];
-		}
-
-		// Big pattern for the rest of the table-related queries in MySQL 5.0
-		if ( preg_match( '/^\s*(?:'
-				. '(?:EXPLAIN\s+(?:EXTENDED\s+)?)?SELECT.*?\s+FROM'
-				. '|INSERT(?:\s+LOW_PRIORITY|\s+DELAYED|\s+HIGH_PRIORITY)?(?:\s+IGNORE)?(?:\s+INTO)?'
-				. '|REPLACE(?:\s+LOW_PRIORITY|\s+DELAYED)?(?:\s+INTO)?'
-				. '|UPDATE(?:\s+LOW_PRIORITY)?(?:\s+IGNORE)?'
-				. '|DELETE(?:\s+LOW_PRIORITY|\s+QUICK|\s+IGNORE)*(?:\s+FROM)?'
-				. '|DESCRIBE|DESC|EXPLAIN|HANDLER'
-				. '|(?:LOCK|UNLOCK)\s+TABLE(?:S)?'
-				. '|(?:RENAME|OPTIMIZE|BACKUP|RESTORE|CHECK|CHECKSUM|ANALYZE|OPTIMIZE|REPAIR).*\s+TABLE'
-				. '|TRUNCATE(?:\s+TABLE)?'
-				. '|CREATE(?:\s+TEMPORARY)?\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?'
-				. '|ALTER(?:\s+IGNORE)?\s+TABLE'
-				. '|DROP\s+TABLE(?:\s+IF\s+EXISTS)?'
-				. '|CREATE(?:\s+\w+)?\s+INDEX.*\s+ON'
-				. '|DROP\s+INDEX.*\s+ON'
-				. '|LOAD\s+DATA.*INFILE.*INTO\s+TABLE'
-				. '|(?:GRANT|REVOKE).*ON\s+TABLE'
-				. '|SHOW\s+(?:.*FROM|.*TABLE)'
-				. ')\s+`?([\w-]+)`?/is', $q, $maybe ) ) {
-			return $maybe[1];
-		}
+		$this->ludicrous_callbacks[ $group ][] = $callback;
 	}
 
 	/**
@@ -408,11 +340,11 @@ class hyperdb extends wpdb {
 	 * of them returns something other than null.
 	 */
 	public function run_callbacks( $group, $args = null ) {
-		if ( !isset( $this->hyper_callbacks[$group] ) || !is_array( $this->hyper_callbacks[$group] ) ) {
+		if ( ! isset( $this->ludicrous_callbacks[$group] ) || !is_array( $this->ludicrous_callbacks[$group] ) ) {
 			return null;
 		}
 
-		if ( !isset( $args ) ) {
+		if ( ! isset( $args ) ) {
 			$args = array( &$this );
 		} elseif ( is_array( $args ) ) {
 			$args[] = &$this;
@@ -420,7 +352,7 @@ class hyperdb extends wpdb {
 			$args = array( $args, &$this );
 		}
 
-		foreach ( $this->hyper_callbacks[$group] as $func ) {
+		foreach ( $this->ludicrous_callbacks[$group] as $func ) {
 			$result = call_user_func_array( $func, $args );
 			if ( isset( $result ) ) {
 				return $result;
@@ -444,18 +376,28 @@ class hyperdb extends wpdb {
 
 		$this->last_table = $this->table = $this->get_table_from_query( $query );
 
-		if ( isset( $this->hyper_tables[$this->table] ) ) {
-			$dataset = $this->hyper_tables[$this->table];
+		// Use current table with no callback results
+		if ( isset( $this->ludicrous_tables[$this->table] ) ) {
+			$dataset               = $this->ludicrous_tables[$this->table];
 			$this->callback_result = null;
-		} elseif ( null !== $this->callback_result = $this->run_callbacks( 'dataset', $query ) ) {
-			if ( is_array( $this->callback_result ) ) {
-				extract( $this->callback_result, EXTR_OVERWRITE );
-			} else {
-				$dataset = $this->callback_result;
+
+		// Run callbacks and either extract or update dataset
+		} else {
+
+			// Run callbacks and get result
+			$this->callback_result = $this->run_callbacks( 'dataset', $query );
+
+			// Set if not null
+			if ( ! is_null( $this->callback_result ) ) {
+				if ( is_array( $this->callback_result ) ) {
+					extract( $this->callback_result, EXTR_OVERWRITE );
+				} else {
+					$dataset = $this->callback_result;
+				}
 			}
 		}
 
-		if ( !isset( $dataset ) ) {
+		if ( ! isset( $dataset ) ) {
 			$dataset = 'global';
 		}
 
@@ -467,7 +409,7 @@ class hyperdb extends wpdb {
 
 		$this->run_callbacks( 'dataset_found', $dataset );
 
-		if ( empty( $this->hyper_servers ) ) {
+		if ( empty( $this->ludicrous_servers ) ) {
 			if ( is_resource( $this->dbh ) ) {
 				return $this->dbh;
 			}
@@ -479,7 +421,14 @@ class hyperdb extends wpdb {
 
 			$this->dbh = @ $connect_function( DB_HOST, DB_USER, DB_PASSWORD, true );
 
-			if ( !is_resource( $this->dbh ) ) {
+			if ( ! is_resource( $this->dbh ) ) {
+
+				// Load custom DB error template, if present.
+				if ( file_exists( WP_CONTENT_DIR . '/db-error.php' ) ) {
+					require_once( WP_CONTENT_DIR . '/db-error.php' );
+					die();
+				}
+
 				return $this->bail( "We were unable to connect to the database. (DB_HOST)" );
 			}
 
@@ -507,7 +456,7 @@ class hyperdb extends wpdb {
 			}
 
 		// Detect queries that have a join in the srtm array.
-		} elseif ( !isset( $use_master ) && is_array( $this->srtm ) && !empty( $this->srtm ) ) {
+		} elseif ( ! isset( $use_master ) && is_array( $this->srtm ) && !empty( $this->srtm ) ) {
 			$use_master  = false;
 			$query_match = substr( $query, 0, 1000 );
 			foreach ( $this->srtm as $key => $value ) {
@@ -596,17 +545,17 @@ class hyperdb extends wpdb {
 			return $this->bail( "We're updating the database, please try back in 5 minutes. If you are posting to your blog please hit the refresh button on your browser in a few minutes to post the data again. It will be posted as soon as the database is back online again." );
 		}
 
-		if ( empty( $this->hyper_servers[$dataset][$operation] ) ) {
+		if ( empty( $this->ludicrous_servers[$dataset][$operation] ) ) {
 			return $this->bail( "No databases available with $this->table ($dataset)" );
 		}
 
 		// Put the groups in order by priority
-		ksort( $this->hyper_servers[$dataset][$operation] );
+		ksort( $this->ludicrous_servers[$dataset][$operation] );
 
 		// Make a list of at least $this->min_tries connections to try, repeating as necessary.
 		$servers = array();
 		do {
-			foreach ( $this->hyper_servers[$dataset][$operation] as $group => $items ) {
+			foreach ( $this->ludicrous_servers[$dataset][$operation] as $group => $items ) {
 				$keys = array_keys( $items );
 				shuffle( $keys );
 				foreach ( $keys as $key ) {
@@ -614,11 +563,11 @@ class hyperdb extends wpdb {
 				}
 			}
 
-			if ( !$tries_remaining = count( $servers ) ) {
+			if ( ! $tries_remaining = count( $servers ) ) {
 				return $this->bail( "No database servers were found to match the query. ($this->table, $dataset)" );
 			}
 
-			if ( !isset( $unique_servers ) ) {
+			if ( ! isset( $unique_servers ) ) {
 				$unique_servers = $tries_remaining;
 			}
 		} while ( $tries_remaining < $this->min_tries );
@@ -640,7 +589,7 @@ class hyperdb extends wpdb {
 				extract( $group_key, EXTR_OVERWRITE );
 
 				// $host, $user, $password, $name, $read, $write [, $lag_threshold, $connect_function, $timeout ]
-				extract( $this->hyper_servers[$dataset][$operation][$group][$key], EXTR_OVERWRITE );
+				extract( $this->ludicrous_servers[ $dataset ][ $operation ][ $group ][ $key ], EXTR_OVERWRITE );
 				$port = null;
 
 				// Split host:port into $host and $port
@@ -664,12 +613,12 @@ class hyperdb extends wpdb {
 				}
 
 				// Use a default timeout of 200ms
-				if ( !isset( $timeout ) ) {
+				if ( ! isset( $timeout ) ) {
 					$timeout = 0.2;
 				}
 
 				// Get the minimum group here, in case $server rewrites it
-				if ( !isset( $min_group ) || $min_group > $group ) {
+				if ( ! isset( $min_group ) || $min_group > $group ) {
 					$min_group = $group;
 				}
 
@@ -680,10 +629,10 @@ class hyperdb extends wpdb {
 					: $this->default_lag_threshold;
 
 				// Check for a lagged slave, if applicable
-				if ( !$use_master && !$write && !isset( $ignore_slave_lag ) && isset( $this->lag_threshold ) && !isset( $server['host'] ) && ( $lagged_status = $this->get_lag_cache() ) === HYPERDB_LAG_BEHIND ) {
+				if ( ! $use_master && ! $write && ! isset( $ignore_slave_lag ) && isset( $this->lag_threshold ) && ! isset( $server['host'] ) && ( $lagged_status = $this->get_lag_cache() ) === DB_LAG_BEHIND ) {
 
 					// If it is the last lagged slave and it is with the best preference we will ignore its lag
-					if ( !isset( $unique_lagged_slaves["$host:$port"] ) && $unique_servers == count( $unique_lagged_slaves ) + 1 && $group == $min_group ) {
+					if ( ! isset( $unique_lagged_slaves["$host:$port"] ) && $unique_servers == count( $unique_lagged_slaves ) + 1 && $group == $min_group ) {
 						$this->lag_threshold = null;
 					} else {
 						$unique_lagged_slaves["$host:$port"] = $this->lag;
@@ -695,7 +644,7 @@ class hyperdb extends wpdb {
 
 				// Connect if necessary or possible
 				$tcp = null;
-				if ( $use_master || !$tries_remaining || !$this->check_tcp_responsiveness || true === $tcp = $this->check_tcp_responsiveness( $host, $port, $timeout ) ) {
+				if ( $use_master || ! $tries_remaining || ! $this->check_tcp_responsiveness || true === $tcp = $this->check_tcp_responsiveness( $host, $port, $timeout ) ) {
 					$this->dbhs[$dbhname] = @ $connect_function( "$host:$port", $user, $password, true );
 				} else {
 					$this->dbhs[$dbhname] = false;
@@ -708,8 +657,8 @@ class hyperdb extends wpdb {
 					 * If we care about lag, disconnect lagged slaves and try to find others.
 					 * We don't disconnect if it is the last lagged slave and it is with the best preference.
 					 */
-					if ( !$use_master && !$write && !isset( $ignore_slave_lag ) && isset( $this->lag_threshold ) && !isset( $server['host'] ) && $lagged_status !== HYPERDB_LAG_OK && ( $lagged_status = $this->get_lag() ) === HYPERDB_LAG_BEHIND && !(
-						!isset( $unique_lagged_slaves["$host:$port"] ) && $unique_servers == count( $unique_lagged_slaves ) + 1 && $group == $min_group
+					if ( ! $use_master && ! $write && ! isset( $ignore_slave_lag ) && isset( $this->lag_threshold ) && ! isset( $server['host'] ) && $lagged_status !== DB_LAG_OK && ( $lagged_status = $this->get_lag() ) === DB_LAG_BEHIND && !(
+						! isset( $unique_lagged_slaves["$host:$port"] ) && $unique_servers == count( $unique_lagged_slaves ) + 1 && $group == $min_group
 						)
 					) {
 						$success = false;
@@ -748,13 +697,13 @@ class hyperdb extends wpdb {
 						: $tcp ) . ",\n";
 				$msg .= "'lagged_status' => " . ( isset( $lagged_status )
 						? $lagged_status
-						: HYPERDB_LAG_UNKNOWN );
+						: DB_LAG_UNKNOWN );
 
 				$this->print_error( $msg );
 			}
 
-			if ( !$success || !isset( $this->dbhs[$dbhname] ) || !is_resource( $this->dbhs[$dbhname] ) ) {
-				if ( !isset( $ignore_slave_lag ) && count( $unique_lagged_slaves ) ) {
+			if ( ! $success || ! isset( $this->dbhs[$dbhname] ) || !is_resource( $this->dbhs[$dbhname] ) ) {
+				if ( ! isset( $ignore_slave_lag ) && count( $unique_lagged_slaves ) ) {
 					// Lagged slaves were not used. Ignore the lag for this connection attempt and retry.
 					$ignore_slave_lag = true;
 					$tries_remaining = count( $servers );
@@ -777,11 +726,11 @@ class hyperdb extends wpdb {
 			break;
 		} while ( true );
 
-		if ( !isset( $charset ) ) {
+		if ( ! isset( $charset ) ) {
 			$charset = null;
 		}
 
-		if ( !isset( $collate ) ) {
+		if ( ! isset( $collate ) ) {
 			$collate = null;
 		}
 
@@ -791,7 +740,7 @@ class hyperdb extends wpdb {
 		$this->last_used_server       = compact( 'host', 'user', 'name', 'read', 'write' );
 		$this->used_servers[$dbhname] = $this->last_used_server;
 
-		while ( !$this->persistent && count( $this->open_connections ) > $this->max_connections ) {
+		while ( ! $this->persistent && count( $this->open_connections ) > $this->max_connections ) {
 			$oldest_connection = array_shift( $this->open_connections );
 			if ( $this->dbhs[$oldest_connection] != $this->dbhs[$dbhname] ) {
 				$this->disconnect( $oldest_connection );
@@ -804,7 +753,7 @@ class hyperdb extends wpdb {
 	/*
 	 * Force addslashes() for the escapes.
 	 *
-	 * HyperDB makes connections when a query is made
+	 * LudicrousDB makes connections when a query is made
 	 * which is why we can't use mysql_real_escape_string() for escapes.
 	 * This is also the reason why we don't allow certain charsets. See set_charset().
 	 */
@@ -820,25 +769,29 @@ class hyperdb extends wpdb {
 	 * @param string   $collate The collation (optional)
 	 */
 	public function set_charset( $dbh, $charset = null, $collate = null ) {
-		if ( !isset( $charset ) ) {
+		if ( ! isset( $charset ) ) {
 			$charset = $this->charset;
 		}
 
-		if ( !isset( $collate ) ) {
+		if ( ! isset( $collate ) ) {
 			$collate = $this->collate;
 		}
 
-		if ( !in_array( strtolower( $charset ), array( 'utf8', 'utf8mb4', 'latin1' ) ) ) {
-			wp_die( "$charset charset isn't supported in HyperDB for security reasons" );
+		if ( empty( $charset ) || empty( $collate ) ) {
+			wp_die( $dbh . '  ' . $charset . '  ' . $collate );
 		}
 
-		if ( $this->has_cap( 'collation', $dbh ) && !empty( $charset ) ) {
+		if ( !in_array( strtolower( $charset ), array( 'utf8', 'utf8mb4', 'latin1' ) ) ) {
+			wp_die( "$charset charset isn't supported in LudicrousDB for security reasons" );
+		}
+
+		if ( $this->has_cap( 'collation', $dbh ) && ! empty( $charset ) ) {
 			if ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
 				mysql_set_charset( $charset, $dbh );
 				$this->real_escape = true;
 			} else {
 				$query = $this->prepare( 'SET NAMES %s', $charset );
-				if ( !empty( $collate ) ) {
+				if ( ! empty( $collate ) ) {
 					$query .= $this->prepare( ' COLLATE %s', $collate );
 				}
 				mysql_query( $query, $dbh );
@@ -1034,7 +987,7 @@ class hyperdb extends wpdb {
 	 * @return false|string false on failure, version number on success
 	 */
 	public function db_version( $dbh_or_table = false ) {
-		if ( !$dbh_or_table && $this->dbh ) {
+		if ( ! $dbh_or_table && $this->dbh ) {
 			$dbh = & $this->dbh;
 		} elseif ( is_resource( $dbh_or_table ) ) {
 			$dbh = & $dbh_or_table;
@@ -1066,7 +1019,7 @@ class hyperdb extends wpdb {
 		foreach ( (array) $bt as $trace ) {
 			if ( isset( $trace['class'] ) && is_a( $this, $trace['class'] ) ) {
 				continue;
-			} elseif ( !isset( $trace['function'] ) ) {
+			} elseif ( ! isset( $trace['function'] ) ) {
 				continue;
 			} elseif ( strtolower( $trace['function'] ) === 'call_user_func_array' ) {
 				continue;
@@ -1143,20 +1096,20 @@ class hyperdb extends wpdb {
 
 	public function check_lag() {
 		if ( false === $this->lag ) {
-			return HYPERDB_LAG_UNKNOWN;
+			return DB_LAG_UNKNOWN;
 		}
 
 		if ( $this->lag > $this->lag_threshold ) {
-			return HYPERDB_LAG_BEHIND;
+			return DB_LAG_BEHIND;
 		}
 
-		return HYPERDB_LAG_OK;
+		return DB_LAG_OK;
 	}
 
 	/**
 	 * Retrieves a table's character set.
 	 *
-	 * NOTE: This must be called after hyperdb::db_connect, so that wpdb::dbh is set correctly
+	 * NOTE: This must be called after LudicrousDB::db_connect, so that wpdb::dbh is set correctly
 	 *
 	 * @param string $table Table name
 	 *
@@ -1202,7 +1155,7 @@ class hyperdb extends wpdb {
 	 * Classes that extend wpdb can override this function without needing to copy/paste
 	 * all of wpdb::strip_invalid_text().
 	 *
-	 * NOTE: This must be called after hyperdb::db_connect, so that wpdb::dbh is set correctly
+	 * NOTE: This must be called after LudicrousDB::db_connect, so that wpdb::dbh is set correctly
 	 *
 	 * @param string $string  String to convert
 	 * @param string $charset Character set to test against (uses MySQL character set names)
@@ -1226,7 +1179,7 @@ class hyperdb extends wpdb {
  	}
 }
 
-// class hyperdb
-$wpdb = new hyperdb();
+// class LudicrousDB
+$wpdb = new LudicrousDB();
 
 require( DB_CONFIG_FILE );
