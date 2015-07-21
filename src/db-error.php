@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * LudicrousDB fatal database error file
+ *
+ * This file should be installed at WP_CONTENT_DIR/db-error.php
+ *
+ * See readme.txt for documentation.
+ */
+
 status_header( 500 ); // Error
 nocache_headers();    // No cache
 
