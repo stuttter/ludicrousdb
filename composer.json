@@ -5,7 +5,7 @@
   "type": "wordpress-muplugin",
   "require": {
     "php": ">=5.2",
-    "composer/installers": "^1.0"
+    "composer/installers": "~1.0"
   },
   "license": "GPLv2 or later",
   "authors": [
