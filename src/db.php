@@ -242,6 +242,11 @@ class LudicrousDB extends wpdb {
 	 * @param array db class vars
 	 */
 	public function __construct( $args = null ) {
+
+		if ( WP_DEBUG && WP_DEBUG_DISPLAY ) {
+			$this->show_errors();
+		}
+
 		if ( is_array( $args ) ) {
 			foreach ( get_class_vars( __CLASS__ ) as $var => $value ) {
 				if ( isset( $args[$var] ) ) {
@@ -257,12 +262,17 @@ class LudicrousDB extends wpdb {
 	 * Sets $this->charset and $this->collate
 	 */
 	public function init_charset() {
+		global $wp_version;
 		if ( function_exists( 'is_multisite' ) && is_multisite() ) {
-			$this->charset = 'utf8mb4';
+			if ( version_compare( $wp_version, '4.2', '<' ) ) {
+				$this->charset = 'utf8';
+				$this->collate = 'utf8_general_ci';
+			} else {
+				$this->charset = 'utf8mb4';
+				$this->collate = 'utf8mb4_unicode_ci';
+			}
 			if ( defined( 'DB_COLLATE' ) && DB_COLLATE ) {
 				$this->collate = DB_COLLATE;
-			} else {
-				$this->collate = 'utf8mb4_unicode_ci';
 			}
 		} elseif ( defined( 'DB_COLLATE' ) ) {
 			$this->collate = DB_COLLATE;
@@ -419,29 +429,14 @@ class LudicrousDB extends wpdb {
 				return $this->bail( "We were unable to query because there was no database defined." );
 			}
 
-			$this->dbh = @ $connect_function( DB_HOST, DB_USER, DB_PASSWORD, true );
+			// Fallback to wpdb db_connect method.
 
-			if ( ! is_resource( $this->dbh ) ) {
+			$this->dbuser     = DB_USER;
+			$this->dbpassword = DB_PASSWORD;
+			$this->dbname     = DB_NAME;
+			$this->dbhost     = DB_HOST;
 
-				// Load custom DB error template, if present.
-				if ( file_exists( WP_CONTENT_DIR . '/db-error.php' ) ) {
-					require_once( WP_CONTENT_DIR . '/db-error.php' );
-					die();
-				}
-
-				return $this->bail( "We were unable to connect to the database. (DB_HOST)" );
-			}
-
-			if ( !mysql_select_db( DB_NAME, $this->dbh ) ) {
-				return $this->bail( "We were unable to select the database." );
-			}
-
-			if ( !empty( $this->charset ) ) {
-				$_collate = !empty( $this->collate )
-					? $this->collate
-					: null;
-				$this->set_charset( $this->dbh, $this->charset, $_collate );
-			}
+			parent::db_connect();
 
 			return $this->dbh;
 		}
@@ -835,6 +830,14 @@ class LudicrousDB extends wpdb {
 
 		// some queries are made before the plugins have been loaded, and thus cannot be filtered with this method
 		if ( function_exists( 'apply_filters' ) ) {
+			/**
+			 * Filter the database query.
+			 *
+			 * Some queries are made before the plugins have been loaded,
+			 * and thus cannot be filtered with this method.
+			 *
+			 * @param string $query Database query.
+			 */
 			$query = apply_filters( 'query', $query );
 		}
 
@@ -844,6 +847,20 @@ class LudicrousDB extends wpdb {
 
 		// Log how the function was called
 		$this->func_call = "\$db->query(\"$query\")";
+
+		// If we're writing to the database, make sure the query will write safely.
+		if ( $this->check_current_query && ! $this->check_ascii( $query ) ) {
+			$stripped_query = $this->strip_invalid_text_from_query( $query );
+			// strip_invalid_text_from_query() can perform queries, so we need
+			// to flush again, just to make sure everything is clear.
+			$this->flush();
+			if ( $stripped_query !== $query ) {
+				$this->insert_id = 0;
+				return false;
+			}
+		}
+
+		$this->check_current_query = true;
 
 		// Keep track of the last query for debug..
 		$this->last_query = $query;
@@ -876,7 +893,7 @@ class LudicrousDB extends wpdb {
 				$this->last_found_rows_result = null;
 			}
 
-			if ( $this->save_queries ) {
+			if ( $this->save_queries || ( defined( 'SAVEQUERIES' ) && SAVEQUERIES )) {
 				if ( is_callable( $this->save_query_callback ) ) {
 					$this->queries[] = call_user_func_array( $this->save_query_callback, array( $query, $elapsed, $this->save_backtrace
 							? debug_backtrace( false )
@@ -967,12 +984,11 @@ class LudicrousDB extends wpdb {
 	 * @return WP_Error
 	 */
 	public function check_database_version( $dbh_or_table = false ) {
-		global $wp_version;
-
-		// Make sure the server has MySQL 4.1.2
+		global $wp_version, $required_mysql_version;
+		// Make sure the server has the required MySQL version
 		$mysql_version = preg_replace( '|[^0-9\.]|', '', $this->db_version( $dbh_or_table ) );
-		if ( version_compare( $mysql_version, '4.1.2', '<' ) ) {
-			return new WP_Error( 'database_version', sprintf( __( '<strong>ERROR</strong>: WordPress %s requires MySQL 4.1.2 or higher' ), $wp_version ) );
+		if ( version_compare( $mysql_version, $required_mysql_version, '<' ) ) {
+			return new WP_Error( 'database_version', sprintf( __( '<strong>ERROR</strong>: WordPress %1$s requires MySQL %2$s or higher' ), $wp_version, $required_mysql_version ) );
 		}
 	}
 
@@ -982,7 +998,8 @@ class LudicrousDB extends wpdb {
 	 * The additional argument allows the caller to check a specific database.
 	 * @return bool
 	 */
-	public function supports_collation( $dbh_or_table = false ) {
+	public function supports_collation( $dbh_or_table = false ){
+		_deprecated_function( __FUNCTION__, '3.5', 'wpdb::has_cap( \'collation\' )' );
 		return $this->has_cap( 'collation', $dbh_or_table );
 	}
 
@@ -996,14 +1013,39 @@ class LudicrousDB extends wpdb {
 	public function has_cap( $db_cap, $dbh_or_table = false ) {
 		$version = $this->db_version( $dbh_or_table );
 
-		switch ( strtolower( $db_cap ) ) :
-			case 'collation' :
-			case 'group_concat' :
-			case 'subqueries' :
+		switch ( strtolower( $db_cap ) ) {
+			case 'collation' :    // @since 2.5.0
+			case 'group_concat' : // @since 2.7.0
+			case 'subqueries' :   // @since 2.7.0
 				return version_compare( $version, '4.1', '>=' );
 			case 'set_charset' :
 				return version_compare( $version, '5.0.7', '>=' );
-		endswitch;
+			case 'utf8mb4' :      // @since 4.1.0
+				if ( version_compare( $version, '5.5.3', '<' ) ) {
+					return false;
+				}
+
+				$dbh = $this->get_db_object( $dbh_or_table );
+				if ( is_resource( $dbh ) ) {
+					if ( $this->use_mysqli ) {
+						$client_version = mysqli_get_client_info( $dbh );
+					} else {
+						$client_version = mysql_get_client_info( $dbh );
+					}
+
+					/*
+					 * libmysql has supported utf8mb4 since 5.5.3, same as the MySQL server.
+					 * mysqlnd has supported utf8mb4 since 5.0.9.
+					 */
+					if ( false !== strpos( $client_version, 'mysqlnd' ) ) {
+						$client_version = preg_replace( '/^\D+([\d.]+).*/', '$1', $client_version );
+
+						return version_compare( $client_version, '5.0.9', '>=' );
+					} else {
+						return version_compare( $client_version, '5.5.3', '>=' );
+					}
+				}
+		}
 
 		return false;
 	}
@@ -1014,19 +1056,35 @@ class LudicrousDB extends wpdb {
 	 * @return false|string false on failure, version number on success
 	 */
 	public function db_version( $dbh_or_table = false ) {
+		$dbh = $this->get_db_object( $dbh_or_table );
+
+		if ( is_resource( $dbh ) ) {
+			if ( $this->use_mysqli ) {
+				$server_info = mysqli_get_server_info( $dbh );
+			} else {
+				$server_info = mysql_get_server_info( $dbh );
+			}
+
+			return preg_replace( '/[^0-9.].*/', '', $server_info );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get the db connection object.
+	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 */
+	private function get_db_object( $dbh_or_table ) {
 		if ( ! $dbh_or_table && $this->dbh ) {
-			$dbh = & $this->dbh;
+			$dbh = &$this->dbh;
 		} elseif ( is_resource( $dbh_or_table ) ) {
-			$dbh = & $dbh_or_table;
+			$dbh = &$dbh_or_table;
 		} else {
 			$dbh = $this->db_connect( "SELECT FROM $dbh_or_table $this->users" );
 		}
 
-		if ( ! empty( $dbh ) ) {
-			return preg_replace( '/[^0-9.].*/', '', mysql_get_server_info( $dbh ) );
-		}
-
-		return false;
+		return $dbh;
 	}
 
 	/**
@@ -1034,13 +1092,16 @@ class LudicrousDB extends wpdb {
 	 * @return string the name of the calling function
 	 */
 	public function get_caller() {
+		if ( function_exists( 'wp_debug_backtrace_summary' ) ) {
+			return wp_debug_backtrace_summary( __CLASS__ );
+		}
 
 		// requires PHP 4.3+
-		if ( !is_callable( 'debug_backtrace' ) ) {
+		if ( ! is_callable( 'debug_backtrace' ) ) {
 			return '';
 		}
 
-		$bt = debug_backtrace( false );
+		$bt     = debug_backtrace( false );
 		$caller = '';
 
 		foreach ( (array) $bt as $trace ) {
@@ -1064,6 +1125,7 @@ class LudicrousDB extends wpdb {
 
 			break;
 		}
+
 		return $caller;
 	}
 
@@ -1143,38 +1205,94 @@ class LudicrousDB extends wpdb {
 	 * @return mixed The table character set, or WP_Error if we couldn't find it
 	 */
 	protected function get_table_charset( $table ) {
-		$table = strtolower( $table );
+		$tablekey = strtolower( $table );
 
 		/**
-		 * Overrides the charset being returned, before the DB is checked.
+		 * Filter the table charset value before the DB is checked.
 		 *
-		 * If nothing is returned, the function continues as normal.
+		 * Passing a non-null value to the filter will effectively short-circuit
+		 * checking the DB for the charset, returning that value instead.
 		 *
-		 * @param string $charset The character set to use. Default false.
-		 * @param string $table   The name of the table being checked
+		 *
+		 * @param string $charset The character set to use. Default null.
+		 * @param string $table   The name of the table being checked.
 		 */
-		$charset = apply_filters( 'pre_get_table_charset', false, $table );
-		if ( $charset ) {
+		$charset = apply_filters( 'pre_get_table_charset', null, $table );
+		if ( null !== $charset ) {
 			return $charset;
 		}
 
-		if ( isset( $this->table_charset[ $table ] ) ) {
-			return $this->table_charset[ $table ];
+		if ( isset( $this->table_charset[ $tablekey ] ) ) {
+			return $this->table_charset[ $tablekey ];
 		}
 
-		$query = $this->prepare( 'SHOW TABLE STATUS LIKE %s', $table );
+		$charsets = $columns = array();
 
-		$result = @mysql_query( $query, $this->dbh );
-		$status = mysql_fetch_object( $result );
-
-		list( $charset ) = explode( '_', $status->Collation );
-		if ( null === $charset ) {
+		$table_parts = explode( '.', $table );
+		$table = '`' . implode( '`.`', $table_parts ) . '`';
+		$results = $this->get_results( "SHOW FULL COLUMNS FROM $table" );
+		if ( ! $results ) {
 			return new WP_Error( 'wpdb_get_table_charset_failure' );
 		}
 
-		$this->table_charset[ $table ] = $charset;
+		foreach ( $results as $column ) {
+			$columns[ strtolower( $column->Field ) ] = $column;
+		}
 
-		return $this->table_charset[ $table ];
+		$this->col_meta[ $tablekey ] = $columns;
+
+		foreach ( $columns as $column ) {
+			if ( ! empty( $column->Collation ) ) {
+				list( $charset ) = explode( '_', $column->Collation );
+
+				// If the current connection can't support utf8mb4 characters, let's only send 3-byte utf8 characters.
+				if ( 'utf8mb4' === $charset && ! $this->has_cap( 'utf8mb4' ) ) {
+					$charset = 'utf8';
+				}
+
+				$charsets[ strtolower( $charset ) ] = true;
+			}
+
+			list( $type ) = explode( '(', $column->Type );
+
+			// A binary/blob means the whole query gets treated like this.
+			if ( in_array( strtoupper( $type ), array( 'BINARY', 'VARBINARY', 'TINYBLOB', 'MEDIUMBLOB', 'BLOB', 'LONGBLOB' ) ) ) {
+				$this->table_charset[ $tablekey ] = 'binary';
+				return 'binary';
+			}
+		}
+
+		// utf8mb3 is an alias for utf8.
+		if ( isset( $charsets['utf8mb3'] ) ) {
+			$charsets['utf8'] = true;
+			unset( $charsets['utf8mb3'] );
+		}
+
+		// Check if we have more than one charset in play.
+		$count = count( $charsets );
+		if ( 1 === $count ) {
+			$charset = key( $charsets );
+		} elseif ( 0 === $count ) {
+			// No charsets, assume this table can store whatever.
+			$charset = false;
+		} else {
+			// More than one charset. Remove latin1 if present and recalculate.
+			unset( $charsets['latin1'] );
+			$count = count( $charsets );
+			if ( 1 === $count ) {
+				// Only one charset (besides latin1).
+				$charset = key( $charsets );
+			} elseif ( 2 === $count && isset( $charsets['utf8'], $charsets['utf8mb4'] ) ) {
+				// Two charsets, but they're utf8 and utf8mb4, use utf8.
+				$charset = 'utf8';
+			} else {
+				// Two mixed character sets. ascii.
+				$charset = 'ascii';
+			}
+		}
+
+		$this->table_charset[ $tablekey ] = $charset;
+		return $charset;
 	}
 
 	/**
