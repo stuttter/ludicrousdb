@@ -188,6 +188,17 @@ class LudicrousDB extends wpdb {
 	 */
 	public $min_tries = 3;
 
+
+	/**
+	 * The number of times to retry reconnecting before dying.
+	 * Added for backwards compat.
+	 *
+	 * @access protected
+	 * @see wpdb::check_connection()
+	 * @var int
+	 */
+	protected $reconnect_retries = 3;
+
 	/**
 	 * Send Reads To Masters. This disables slave connections while true.
 	 * Otherwise it is an array of written tables.
@@ -246,6 +257,25 @@ class LudicrousDB extends wpdb {
 		if ( WP_DEBUG && WP_DEBUG_DISPLAY ) {
 			$this->show_errors();
 		}
+
+		/* Use ext/mysqli if it exists and:
+		 *  - WP_USE_EXT_MYSQL is defined as false, or
+		 *  - We are a development version of WordPress, or
+		 *  - We are running PHP 5.5 or greater, or
+		 *  - ext/mysql is not loaded.
+		 */
+		if ( function_exists( 'mysqli_connect' ) ) {
+			if ( defined( 'WP_USE_EXT_MYSQL' ) ) {
+				$this->use_mysqli = ! WP_USE_EXT_MYSQL;
+			} elseif ( version_compare( phpversion(), '5.5', '>=' ) || ! function_exists( 'mysql_connect' ) ) {
+				$this->use_mysqli = true;
+			} elseif ( false !== strpos( $GLOBALS['wp_version'], '-' ) ) {
+				$this->use_mysqli = true;
+			}
+		}
+
+
+		$this->reconnect_retries = $this->min_tries;
 
 		if ( is_array( $args ) ) {
 			foreach ( get_class_vars( __CLASS__ ) as $var => $value ) {
@@ -488,7 +518,7 @@ class LudicrousDB extends wpdb {
 				// A callback has specified a database name so it's possible the
 				// existing connection selected a different one.
 				if ( $name != $this->used_servers[$dbhname]['name'] ) {
-					if ( !mysql_select_db( $name, $this->dbhs[$dbhname] ) ) {
+					if ( !$this->select( $name, $this->dbhs[$dbhname] ) ) {
 						// this can happen when the user varies and lacks permission on the $name database
 						if ( isset( $conn['disconnect (select failed)'] ) ) {
 							++$conn['disconnect (select failed)'];
@@ -516,7 +546,7 @@ class LudicrousDB extends wpdb {
 			$this->last_used_server = $this->used_servers[$dbhname];
 			$this->last_connection  = compact( 'dbhname', 'name' );
 
-			if ( !mysql_ping( $this->dbhs[$dbhname] ) ) {
+			if ( ! $this->check_connection( false, $this->dbhs[ $dbhname ] ) ) {
 				if ( isset( $conn['disconnect (ping failed)'] ) ) {
 					++$conn['disconnect (ping failed)'];
 				} else {
@@ -547,7 +577,7 @@ class LudicrousDB extends wpdb {
 		// Put the groups in order by priority
 		ksort( $this->ludicrous_servers[$dataset][$operation] );
 
-		// Make a list of at least $this->min_tries connections to try, repeating as necessary.
+		// Make a list of at least $this->reconnect_retries connections to try, repeating as necessary.
 		$servers = array();
 		do {
 			foreach ( $this->ludicrous_servers[$dataset][$operation] as $group => $items ) {
@@ -565,7 +595,7 @@ class LudicrousDB extends wpdb {
 			if ( ! isset( $unique_servers ) ) {
 				$unique_servers = $tries_remaining;
 			}
-		} while ( $tries_remaining < $this->min_tries );
+		} while ( $tries_remaining < $this->reconnect_retries );
 
 		// Connect to a database server
 		do {
@@ -663,7 +693,7 @@ class LudicrousDB extends wpdb {
 						$msg = "Replication lag of {$this->lag}s on $host:$port ($dbhname)";
 						$this->print_error( $msg );
 						continue;
-					} elseif ( mysql_select_db( $name, $this->dbhs[$dbhname] ) ) {
+					} elseif ( $this->select( $name, $this->dbhs[$dbhname] ) ) {
 						$success = true;
 						$this->current_host = "$host:$port";
 						$this->dbh2host[$dbhname] = "$host:$port";
@@ -681,12 +711,21 @@ class LudicrousDB extends wpdb {
 				$success = false;
 				$this->last_connection  = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success' );
 				$this->db_connections[] = $this->last_connection;
+
+				if ( $this->use_mysqli ) {
+					$error = mysqli_error( $this->dbhs[ $dbhname ] );
+					$errno = mysqli_errno( $this->dbhs[ $dbhname ] );
+				} else {
+					$error = mysql_error( $this->dbhs[ $dbhname ] );
+					$errno = mysql_errno( $this->dbhs[ $dbhname ] );
+				}
+
 				$msg = date( "Y-m-d H:i:s" ) . " Can't select $dbhname - \n";
 				$msg .= "'referrer' => '{$_SERVER['HTTP_HOST']}{$_SERVER['REQUEST_URI']}',\n";
 				$msg .= "'server' => {$server},\n";
 				$msg .= "'host' => {$host},\n";
-				$msg .= "'error' => " . mysql_error() . ",\n";
-				$msg .= "'errno' => " . mysql_errno() . ",\n";
+				$msg .= "'error' => " . $error . ",\n";
+				$msg .= "'errno' => " . $errno . ",\n";
 				$msg .= "'tcp_responsive' => " . ( $tcp === true
 						? 'true'
 						: $tcp ) . ",\n";
@@ -745,6 +784,51 @@ class LudicrousDB extends wpdb {
 		return $this->dbhs[$dbhname];
 	}
 
+	/**
+	 * Selects a database using the current database connection.
+	 *
+	 * The database name will be changed based on the current database
+	 * connection. On failure, the execution will bail and display an DB error.
+	 *
+	 *
+	 * @param string        $db  MySQL database name
+	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 */
+	public function select( $db, $dbh_or_table = false ) {
+		$dbh = $this->get_db_object( $dbh_or_table );
+
+		if ( $this->use_mysqli ) {
+			$success = mysqli_select_db( $dbh, $db );
+		} else {
+			$success = mysql_select_db( $db, $dbh );
+		}
+
+		return $success;
+	}
+
+	/**
+	 * Load the column metadata from the last query.
+	 *
+	 *
+	 * @access protected
+	 */
+	protected function load_col_info() {
+		if ( $this->col_info )
+			return;
+		$this->col_info = array();
+		if ( $this->use_mysqli ) {
+			$num_fields = mysqli_num_fields( $this->result );
+			for ( $i = 0; $i < $num_fields; $i ++ ) {
+				$this->col_info[ $i ] = mysqli_fetch_field( $this->result );
+			}
+		} else {
+			$num_fields = mysql_num_fields( $this->result );
+			for ( $i = 0; $i < $num_fields; $i ++ ) {
+				$this->col_info[ $i ] = mysql_fetch_field( $this->result, $i );
+			}
+		}
+	}
+
 	/*
 	 * Force addslashes() for the escapes.
 	 *
@@ -781,15 +865,16 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( $this->has_cap( 'collation', $dbh ) && ! empty( $charset ) ) {
-			if ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
+			if ( $this->use_mysqli && function_exists( 'mysqli_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
+				mysqli_set_charset( $dbh, $charset );
+			} else if ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
 				mysql_set_charset( $charset, $dbh );
-				$this->real_escape = true;
 			} else {
 				$query = $this->prepare( 'SET NAMES %s', $charset );
 				if ( ! empty( $collate ) ) {
 					$query .= $this->prepare( ' COLLATE %s', $collate );
 				}
-				mysql_query( $query, $dbh );
+				$this->_do_query( $query, $dbh );
 			}
 		}
 	}
@@ -806,7 +891,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( is_resource( $this->dbhs[$dbhname] ) ) {
-			mysql_close( $this->dbhs[$dbhname] );
+			$this->close( $this->dbhs[$dbhname] );
 		}
 
 		unset( $this->dbhs[$dbhname] );
@@ -819,6 +904,88 @@ class LudicrousDB extends wpdb {
 		$this->last_error = '';
 		$this->num_rows = 0;
 		parent::flush();
+	}
+
+
+	/**
+	 * Check that the connection to the database is still up. If not, try to reconnect.
+	 *
+	 * If this function is unable to reconnect, it will forcibly die, or if after the
+	 * the template_redirect hook has been fired, return false instead.
+	 *
+	 * If $allow_bail is false, the lack of database connection will need
+	 * to be handled manually.
+	 *
+	 *
+	 * @param bool $allow_bail Optional. Allows the function to bail. Default true.
+	 * @return bool|void True if the connection is up.
+	 */
+	public function check_connection( $allow_bail = true, $dbh_or_table = false ) {
+
+		$dbh = $this->get_db_object( $dbh_or_table );
+
+		if ( ! empty( $dbh ) ) {
+			if ( $this->use_mysqli ) {
+				if ( mysqli_ping( $dbh ) ) {
+					return true;
+				}
+			} else {
+				if ( mysql_ping( $dbh ) ) {
+					return true;
+				}
+			}
+		}
+
+		if ( ! $allow_bail ) {
+			return false;
+		}
+
+		$error_reporting = false;
+		// Disable warnings, as we don't want to see a multitude of "unable to connect" messages
+		if ( WP_DEBUG ) {
+			$error_reporting = error_reporting();
+			error_reporting( $error_reporting & ~E_WARNING );
+		}
+		for ( $tries = 1; $tries <= $this->reconnect_retries; $tries++ ) {
+			// On the last try, re-enable warnings. We want to see a single instance of the
+			// "unable to connect" message on the bail() screen, if it appears.
+			if ( $this->reconnect_retries === $tries && WP_DEBUG ) {
+				error_reporting( $error_reporting );
+			}
+			if ( $this->db_connect( false ) ) {
+				if ( $error_reporting ) {
+					error_reporting( $error_reporting );
+				}
+				return true;
+			}
+			sleep( 1 );
+		}
+		// If template_redirect has already happened, it's too late for wp_die()/dead_db().
+		// Let's just return and hope for the best.
+		if ( did_action( 'template_redirect' ) ) {
+			return false;
+		}
+
+		wp_load_translations_early();
+		$message = '<h1>' . __( 'Error reconnecting to the database' ) . "</h1>\n";
+		$message .= '<p>' . sprintf(
+			/* translators: %s: database host */
+				__( 'This means that we lost contact with the database server at %s. This could mean your host&#8217;s database server is down.' ),
+				'<code>' . htmlspecialchars( $this->dbhost, ENT_QUOTES ) . '</code>'
+			) . "</p>\n";
+		$message .= "<ul>\n";
+		$message .= '<li>' . __( 'Are you sure that the database server is running?' ) . "</li>\n";
+		$message .= '<li>' . __( 'Are you sure that the database server is not under particularly heavy load?' ) . "</li>\n";
+		$message .= "</ul>\n";
+		$message .= '<p>' . sprintf(
+			/* translators: %s: support forums URL */
+				__( 'If you&#8217;re unsure what these terms mean you should probably contact your host. If you still need help you can always visit the <a href="%s">WordPress Support Forums</a>.' ),
+				__( 'https://wordpress.org/support/' )
+			) . "</p>\n";
+		// We weren't able to reconnect, so we better bail.
+		$this->bail( $message, 'db_connect_fail' );
+		// Call dead_db() if bail didn't die, because this database is no more. It has ceased to be (at least temporarily).
+		dead_db();
 	}
 
 	/**
@@ -876,7 +1043,7 @@ class LudicrousDB extends wpdb {
 			}
 
 			$this->timer_start();
-			$this->result = mysql_query( $query, $this->dbh );
+			$this->result = $this->_do_query( $query, $this->dbh );
 			$elapsed      = $this->timer_stop();
 
 			++$this->num_queries;
@@ -884,7 +1051,7 @@ class LudicrousDB extends wpdb {
 			if ( preg_match( '/^\s*SELECT\s+SQL_CALC_FOUND_ROWS\s/i', $query ) ) {
 				if ( false === strpos( $query, "NO_SELECT_FOUND_ROWS" ) ) {
 					$this->timer_start();
-					$this->last_found_rows_result = mysql_query( "SELECT FOUND_ROWS()", $this->dbh );
+					$this->last_found_rows_result = $this->_do_query( "SELECT FOUND_ROWS()", $this->dbh );
 					$elapsed += $this->timer_stop();
 					++$this->num_queries;
 					$query .= "; SELECT FOUND_ROWS()";
@@ -905,66 +1072,103 @@ class LudicrousDB extends wpdb {
 		}
 
 		// If there is an error then take note of it
-		$this->last_error = mysql_error( $this->dbh );
+		if ( $this->use_mysqli ) {
+			$this->last_error = mysqli_error( $this->dbh );
+		} else {
+			$this->last_error = mysql_error( $this->dbh );
+		}
+
 		if ( ! empty( $this->last_error ) ) {
 			$this->print_error( $this->last_error );
 			return false;
 		}
 
 		if ( preg_match( "/^\\s*(insert|delete|update|replace|alter) /i", $query ) ) {
-			$this->rows_affected = mysql_affected_rows( $this->dbh );
-
+			if ( $this->use_mysqli ) {
+				$this->rows_affected = mysqli_affected_rows( $this->dbh );
+			} else {
+				$this->rows_affected = mysql_affected_rows( $this->dbh );
+			}
 			// Take note of the insert_id
-			if ( preg_match( "/^\\s*(insert|replace) /i", $query ) ) {
-				$this->insert_id = mysql_insert_id( $this->dbh );
+			if ( preg_match( '/^\s*(insert|replace)\s/i', $query ) ) {
+				if ( $this->use_mysqli ) {
+					$this->insert_id = mysqli_insert_id( $this->dbh );
+				} else {
+					$this->insert_id = mysql_insert_id( $this->dbh );
+				}
 			}
 
 			// Return number of rows affected
 			$return_val = $this->rows_affected;
 		} else {
-			$i = 0;
-			$this->col_info = array();
-			while ( $i < @mysql_num_fields( $this->result ) ) {
-				$this->col_info[$i] = @mysql_fetch_field( $this->result );
-				$i++;
-			}
+			$this->load_col_info();
 			$num_rows = 0;
 			$this->last_result = array();
-			while ( $row = @mysql_fetch_object( $this->result ) ) {
-				$this->last_result[$num_rows] = $row;
-				$num_rows++;
+			if ( $this->use_mysqli && $this->result instanceof mysqli_result ) {
+				while ( $row = mysqli_fetch_object( $this->result ) ) {
+					$this->last_result[$num_rows] = $row;
+					$num_rows++;
+				}
+			} elseif ( is_resource( $this->result ) ) {
+				while ( $row = mysql_fetch_object( $this->result ) ) {
+					$this->last_result[$num_rows] = $row;
+					$num_rows++;
+				}
 			}
-
-			@mysql_free_result( $this->result );
-
 			// Log number of rows the query returned
+			// and return number of rows selected
 			$this->num_rows = $num_rows;
-
-			// Return number of rows selected
-			$return_val = $this->num_rows;
+			$return_val     = $num_rows;
 		}
 
 		return $return_val;
 	}
 
 	/**
+	 *
+	 * Internal function to perform the mysql_query() call.
+	 *
+	 *
+	 * @access protected
+	 * @see wpdb::query()
+	 *
+	 * @param string $query The query to run.
+	 * @param bool $dbh_or_table
+	 */
+	protected function _do_query( $query, $dbh_or_table = false ) {
+
+		$dbh = $this->get_db_object( $dbh_or_table );
+		$result = false;
+		if ( is_resource( $dbh ) ) {
+			if ( $this->use_mysqli ) {
+				$result = mysqli_query( $dbh, $query );
+			} else {
+				$result = mysql_query( $query, $dbh );
+			}
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Closes the current database connection.
 	 *
-	 * @since 4.5.0
 	 * @access public
-	 *
+	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
 	 * @return bool True if the connection was successfully closed, false if it wasn't,
 	 *              or the connection doesn't exist.
 	 */
-	public function close() {
-		if ( ! $this->dbh ) {
+	public function close( $dbh_or_table = false ) {
+		$dbh = $this->get_db_object( $dbh_or_table );
+
+		if ( ! is_resource( $dbh ) ) {
 			return false;
 		}
 
 		if ( $this->use_mysqli ) {
-			$closed = mysqli_close( $this->dbh );
+			$closed = mysqli_close( $dbh );
 		} else {
-			$closed = mysql_close( $this->dbh );
+			$closed = mysql_close( $dbh );
 		}
 
 		if ( $closed ) {
@@ -980,7 +1184,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 2.5.0
 	 * @uses $wp_version
-	 *
+	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
 	 * @return WP_Error
 	 */
 	public function check_database_version( $dbh_or_table = false ) {
@@ -996,6 +1200,7 @@ class LudicrousDB extends wpdb {
 	 * This function is called when WordPress is generating the table schema to determine wether or not the current database
 	 * supports or needs the collation statements.
 	 * The additional argument allows the caller to check a specific database.
+	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
 	 * @return bool
 	 */
 	public function supports_collation( $dbh_or_table = false ){
@@ -1310,12 +1515,17 @@ class LudicrousDB extends wpdb {
 	protected function strip_invalid_text_using_db( $string, $charset ) {
 		$query = $this->prepare( "SELECT CONVERT( %s USING $charset )", $string );
 
-		$result = @mysql_query( $query, $this->dbh );
+		$result = $this->_do_query( $query, $this->dbh );
 		if ( empty( $result ) ) {
 			return new WP_Error( 'wpdb_convert_text_failure' );
 		}
 
-		$row = mysql_fetch_row( $result );
+		if ( $this->use_mysqli ) {
+			$row = mysqli_fetch_row( $result );
+		} else {
+			$row = mysql_fetch_row( $result );
+		}
+
 		if ( ! is_array( $row ) || count( $row ) < 1 ) {
 			return new WP_Error( 'wpdb_convert_text_failure' );
 		}
