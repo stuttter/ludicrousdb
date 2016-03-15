@@ -406,9 +406,6 @@ class LudicrousDB extends wpdb {
 	 * @return resource mysql database connection
 	 */
 	public function db_connect( $query = '' ) {
-		$connect_function = $this->persistent
-			? 'mysql_pconnect'
-			: 'mysql_connect';
 
 		if ( empty( $query ) ) {
 			return false;
@@ -613,7 +610,7 @@ class LudicrousDB extends wpdb {
 				// $group, $key
 				extract( $group_key, EXTR_OVERWRITE );
 
-				// $host, $user, $password, $name, $read, $write [, $lag_threshold, $connect_function, $timeout ]
+				// $host, $user, $password, $name, $read, $write [, $lag_threshold, $timeout ]
 				extract( $this->ludicrous_servers[ $dataset ][ $operation ][ $group ][ $key ], EXTR_OVERWRITE );
 				$port = null;
 
@@ -670,7 +667,7 @@ class LudicrousDB extends wpdb {
 				// Connect if necessary or possible
 				$tcp = null;
 				if ( $use_master || ! $tries_remaining || ! $this->check_tcp_responsiveness || true === $tcp = $this->check_tcp_responsiveness( $host, $port, $timeout ) ) {
-					$this->dbhs[$dbhname] = @ $connect_function( "$host:$port", $user, $password, true );
+					$this->dbhs[$dbhname] = $this->single_db_connect( "$host:$port", $user, $password, true );
 				} else {
 					$this->dbhs[$dbhname] = false;
 				}
@@ -782,6 +779,96 @@ class LudicrousDB extends wpdb {
 		}
 
 		return $this->dbhs[$dbhname];
+	}
+
+
+	/**
+	 * Connect selected database.
+	 *
+	 * @param string $host     Internet address: host:port of server on internet.
+	 * @param string $user     Database user.
+	 * @param string $password Database password.
+	 *
+	 * @return bool|mysqli|resource
+	 */
+	protected function single_db_connect( $host, $user, $password ) {
+		$this->is_mysql = true;
+
+		/*
+		 * Deprecated in 3.9+ when using MySQLi. No equivalent
+		 * $new_link parameter exists for mysqli_* functions.
+		 */
+		$new_link     = defined( 'MYSQL_NEW_LINK' ) ? MYSQL_NEW_LINK : true;
+		$client_flags = defined( 'MYSQL_CLIENT_FLAGS' ) ? MYSQL_CLIENT_FLAGS : 0;
+
+		$dbh = false;
+
+		if ( $this->use_mysqli ) {
+			$dbh = mysqli_init();
+
+			// mysqli_real_connect doesn't support the host param including a port or socket
+			// like mysql_connect does. This duplicates how mysql_connect detects a port and/or socket file.
+			$port           = null;
+			$socket         = null;
+			$port_or_socket = strstr( $host, ':' );
+			if ( ! empty( $port_or_socket ) ) {
+				$host           = substr( $host, 0, strpos( $host, ':' ) );
+				$port_or_socket = substr( $port_or_socket, 1 );
+				if ( 0 !== strpos( $port_or_socket, '/' ) ) {
+					$port         = intval( $port_or_socket );
+					$maybe_socket = strstr( $port_or_socket, ':' );
+					if ( ! empty( $maybe_socket ) ) {
+						$socket = substr( $maybe_socket, 1 );
+					}
+				} else {
+					$socket = $port_or_socket;
+				}
+			}
+			// Detail found here - https://core.trac.wordpress.org/ticket/31018
+			$pre_host = '';
+			// If DB_HOST begins with a 'p:', allow it to be passed to mysqli_real_connect().
+			// mysqli supports persistent connections starting with PHP 5.3.0.
+			if ( $this->persistent && version_compare( phpversion(), '5.3.0', '>=' ) ) {
+				$pre_host = 'p:';
+			}
+
+			mysqli_real_connect( $dbh, $pre_host . $host, $user, $password, null, $port, $socket, $client_flags );
+
+			if ( $dbh->connect_errno ) {
+				$dbh = false;
+
+				/* It's possible ext/mysqli is misconfigured. Fall back to ext/mysql if:
+		 		 *  - We haven't previously connected, and
+		 		 *  - WP_USE_EXT_MYSQL isn't set to false, and
+		 		 *  - ext/mysql is loaded.
+		 		 */
+				$attempt_fallback = true;
+
+				if ( defined( 'WP_USE_EXT_MYSQL' ) && ! WP_USE_EXT_MYSQL ) {
+					$attempt_fallback = false;
+				} elseif ( ! function_exists( 'mysql_connect' ) && ! $this->persistent ) {
+					$attempt_fallback = false;
+				} elseif ( ! function_exists( 'mysql_pconnect' ) && $this->persistent ) {
+					$attempt_fallback = false;
+				}
+
+				if ( $attempt_fallback ) {
+					$this->use_mysqli = false;
+
+					return $this->db_connect( $host, $user, $password );
+				}
+			}
+		} else {
+			// Check if functions exists, as in PHP 7, they may not.
+			if ( $this->persistent && function_exists( 'mysql_pconnect' ) ) {
+				$dbh = mysql_pconnect( $host, $user, $password, $new_link, $client_flags );
+			} elseif ( function_exists( 'mysql_connect' ) ) {
+				$dbh = mysql_connect( $host, $user, $password, $new_link, $client_flags );
+			}
+
+		}
+
+		return $dbh;
 	}
 
 	/**
