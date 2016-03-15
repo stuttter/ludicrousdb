@@ -690,18 +690,21 @@ class LudicrousDB extends wpdb {
 						$msg = "Replication lag of {$this->lag}s on $host:$port ($dbhname)";
 						$this->print_error( $msg );
 						continue;
-					} elseif ( $this->select( $name, $this->dbhs[$dbhname] ) ) {
-						$success = true;
-						$this->current_host = "$host:$port";
-						$this->dbh2host[$dbhname] = "$host:$port";
-						$queries = 1;
-						$lag = isset( $this->lag )
-							? $this->lag
-							: 0;
-						$this->last_connection    = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
-						$this->db_connections[]   = $this->last_connection;
-						$this->open_connections[] = $dbhname;
-						break;
+					} else{
+						$this->set_sql_mode( array(), $this->dbhs[ $dbhname ] );
+						if ( $this->select( $name, $this->dbhs[$dbhname] ) ) {
+							$success = true;
+							$this->current_host = "$host:$port";
+							$this->dbh2host[$dbhname] = "$host:$port";
+							$queries = 1;
+							$lag = isset( $this->lag )
+								? $this->lag
+								: 0;
+							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
+							$this->db_connections[]   = $this->last_connection;
+							$this->open_connections[] = $dbhname;
+							break;
+						}
 					}
 				}
 
@@ -869,6 +872,62 @@ class LudicrousDB extends wpdb {
 		}
 
 		return $dbh;
+	}
+
+
+	/**
+	 * Change the current SQL mode, and ensure its WordPress compatibility.
+	 *
+	 * If no modes are passed, it will ensure the current MySQL server
+	 * modes are compatible.
+	 *
+	 *
+	 * @param array $modes Optional. A list of SQL modes to set.
+	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 */
+	public function set_sql_mode( $modes = array(), $dbh_or_table = false ) {
+		$dbh = $this->get_db_object( $dbh_or_table );
+		if ( empty( $modes ) ) {
+			if ( $this->use_mysqli ) {
+				$res = mysqli_query( $dbh, 'SELECT @@SESSION.sql_mode' );
+			} else {
+				$res = mysql_query( 'SELECT @@SESSION.sql_mode', $dbh );
+			}
+			if ( empty( $res ) ) {
+				return;
+			}
+			if ( $this->use_mysqli ) {
+				$modes_array = mysqli_fetch_array( $res );
+				if ( empty( $modes_array[0] ) ) {
+					return;
+				}
+				$modes_str = $modes_array[0];
+			} else {
+				$modes_str = mysql_result( $res, 0 );
+			}
+			if ( empty( $modes_str ) ) {
+				return;
+			}
+			$modes = explode( ',', $modes_str );
+		}
+		$modes = array_change_key_case( $modes, CASE_UPPER );
+		/**
+		 * Filter the list of incompatible SQL modes to exclude.
+		 *
+		 * @param array $incompatible_modes An array of incompatible modes.
+		 */
+		$incompatible_modes = (array) apply_filters( 'incompatible_sql_modes', $this->incompatible_modes );
+		foreach ( $modes as $i => $mode ) {
+			if ( in_array( $mode, $incompatible_modes ) ) {
+				unset( $modes[ $i ] );
+			}
+		}
+		$modes_str = implode( ',', $modes );
+		if ( $this->use_mysqli ) {
+			mysqli_query( $dbh, "SET SESSION sql_mode='$modes_str'" );
+		} else {
+			mysql_query( "SET SESSION sql_mode='$modes_str'", $dbh );
+		}
 	}
 
 	/**
