@@ -447,7 +447,7 @@ class LudicrousDB extends wpdb {
 		$this->run_callbacks( 'dataset_found', $dataset );
 
 		if ( empty( $this->ludicrous_servers ) ) {
-			if ( is_resource( $this->dbh ) ) {
+			if ( $this->dbh_type_check( $this->dbh ) ) {
 				return $this->dbh;
 			}
 
@@ -500,7 +500,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Try to reuse an existing connection
-		while ( isset( $this->dbhs[$dbhname] ) && is_resource( $this->dbhs[$dbhname] ) ) {
+		while ( isset( $this->dbhs[$dbhname] ) && $this->dbh_type_check( $this->dbhs[$dbhname] ) ) {
 
 			// Find the connection for incrementing counters
 			foreach ( array_keys( $this->db_connections ) as $i ) {
@@ -674,7 +674,7 @@ class LudicrousDB extends wpdb {
 
 				$elapsed = $this->timer_stop();
 
-				if ( is_resource( $this->dbhs[$dbhname] ) ) {
+				if ( $this->dbh_type_check( $this->dbhs[ $dbhname ] ) ) {
 					/**
 					 * If we care about lag, disconnect lagged slaves and try to find others.
 					 * We don't disconnect if it is the last lagged slave and it is with the best preference.
@@ -722,7 +722,6 @@ class LudicrousDB extends wpdb {
 
 				$msg = date( "Y-m-d H:i:s" ) . " Can't select $dbhname - \n";
 				$msg .= "'referrer' => '{$_SERVER['HTTP_HOST']}{$_SERVER['REQUEST_URI']}',\n";
-				$msg .= "'server' => {$server},\n";
 				$msg .= "'host' => {$host},\n";
 				$msg .= "'error' => " . $error . ",\n";
 				$msg .= "'errno' => " . $errno . ",\n";
@@ -736,7 +735,7 @@ class LudicrousDB extends wpdb {
 				$this->print_error( $msg );
 			}
 
-			if ( ! $success || ! isset( $this->dbhs[$dbhname] ) || !is_resource( $this->dbhs[$dbhname] ) ) {
+			if ( ! $success || ! isset( $this->dbhs[$dbhname] ) || !$this->dbh_type_check( $this->dbhs[$dbhname] ) ) {
 				if ( ! isset( $ignore_slave_lag ) && count( $unique_lagged_slaves ) ) {
 					// Lagged slaves were not used. Ignore the lag for this connection attempt and retry.
 					$ignore_slave_lag = true;
@@ -806,7 +805,7 @@ class LudicrousDB extends wpdb {
 		$client_flags = defined( 'MYSQL_CLIENT_FLAGS' ) ? MYSQL_CLIENT_FLAGS : 0;
 
 		if ( $this->use_mysqli ) {
-			$dbh = mysqli_init();
+			$this->dbhs[ $dbhname ] = mysqli_init();
 
 			// mysqli_real_connect doesn't support the host param including a port or socket
 			// like mysql_connect does. This duplicates how mysql_connect detects a port and/or socket file.
@@ -836,28 +835,9 @@ class LudicrousDB extends wpdb {
 
 			mysqli_real_connect( $this->dbhs[ $dbhname ], $pre_host . $host, $user, $password, null, $port, $socket, $client_flags );
 
-			if ( $dbh->connect_errno ) {
+			if ( $this->dbhs[ $dbhname ]->connect_errno ) {
 				$this->dbhs[ $dbhname ] = false;
-
-				/* It's possible ext/mysqli is misconfigured. Fall back to ext/mysql if:
-		 		 *  - We haven't previously connected, and
-		 		 *  - WP_USE_EXT_MYSQL isn't set to false, and
-		 		 *  - ext/mysql is loaded.
-		 		 */
-				$attempt_fallback = true;
-
-				if ( defined( 'WP_USE_EXT_MYSQL' ) && ! WP_USE_EXT_MYSQL ) {
-					$attempt_fallback = false;
-				} elseif ( ! function_exists( 'mysql_connect' ) && ! $this->persistent ) {
-					$attempt_fallback = false;
-				} elseif ( ! function_exists( 'mysql_pconnect' ) && $this->persistent ) {
-					$attempt_fallback = false;
-				}
-
-				if ( $attempt_fallback ) {
-					$this->use_mysqli = false;
-					$this->db_connect( $dbhname, $host, $user, $password );
-				}
+				return false;
 			}
 		} else {
 			// Check if functions exists, as in PHP 7, they may not.
@@ -1032,7 +1012,7 @@ class LudicrousDB extends wpdb {
 			unset( $this->open_connections[$k] );
 		}
 
-		if ( is_resource( $this->dbhs[$dbhname] ) ) {
+		if ( $this->dbh_type_check( $this->dbhs[$dbhname] ) ) {
 			$this->close( $this->dbhs[$dbhname] );
 		}
 
@@ -1174,13 +1154,13 @@ class LudicrousDB extends wpdb {
 		// Keep track of the last query for debug..
 		$this->last_query = $query;
 
-		if ( preg_match( '/^\s*SELECT\s+FOUND_ROWS(\s*)/i', $query ) && is_resource( $this->last_found_rows_result ) ) {
+		if ( preg_match( '/^\s*SELECT\s+FOUND_ROWS(\s*)/i', $query ) && ( ( ! $this->use_mysqli && is_resource( $this->last_found_rows_result ) ) || ( $this->use_mysqli && $this->last_found_rows_result instanceof mysqli_result ) ) ) {
 			$this->result = $this->last_found_rows_result;
 			$elapsed = 0;
 		} else {
 			$this->dbh = $this->db_connect( $query );
 
-			if ( !is_resource( $this->dbh ) ) {
+			if ( !$this->dbh_type_check( $this->dbh ) ) {
 				return false;
 			}
 
@@ -1281,7 +1261,7 @@ class LudicrousDB extends wpdb {
 
 		$dbh = $this->get_db_object( $dbh_or_table );
 		$result = false;
-		if ( is_resource( $dbh ) ) {
+		if ( $this->dbh_type_check( $dbh ) ) {
 			if ( $this->use_mysqli ) {
 				$result = mysqli_query( $dbh, $query );
 			} else {
@@ -1303,7 +1283,7 @@ class LudicrousDB extends wpdb {
 	public function close( $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
 
-		if ( ! is_resource( $dbh ) ) {
+		if ( ! $this->dbh_type_check( $dbh ) ) {
 			return false;
 		}
 
@@ -1373,7 +1353,7 @@ class LudicrousDB extends wpdb {
 				}
 
 				$dbh = $this->get_db_object( $dbh_or_table );
-				if ( is_resource( $dbh ) ) {
+				if ( $this->dbh_type_check( $dbh ) ) {
 					if ( $this->use_mysqli ) {
 						$client_version = mysqli_get_client_info( $dbh );
 					} else {
@@ -1405,7 +1385,7 @@ class LudicrousDB extends wpdb {
 	public function db_version( $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
 
-		if ( is_resource( $dbh ) ) {
+		if ( $this->dbh_type_check( $dbh ) ) {
 			if ( $this->use_mysqli ) {
 				$server_info = mysqli_get_server_info( $dbh );
 			} else {
@@ -1423,15 +1403,32 @@ class LudicrousDB extends wpdb {
 	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
 	 */
 	private function get_db_object( $dbh_or_table ) {
-		if ( ! $dbh_or_table && $this->dbh ) {
-			$dbh = &$this->dbh;
-		} elseif ( is_resource( $dbh_or_table ) ) {
+
+		if ( $this->dbh_type_check( $dbh_or_table ) ) {
 			$dbh = &$dbh_or_table;
+		} elseif ( ! $dbh_or_table && $this->dbh_type_check( $this->dbh ) ) {
+			$dbh = &$this->dbh;
 		} else {
 			$dbh = $this->db_connect( "SELECT FROM $dbh_or_table $this->users" );
 		}
 
 		return $dbh;
+	}
+
+	/**
+	 *
+	 * @param $dbh resource|mysqli
+	 *
+	 * @return bool
+	 */
+	private function dbh_type_check( $dbh ) {
+		if ( $this->use_mysqli && ( $dbh instanceof mysqli ) ) {
+			return true;
+		} else if ( is_resource( $dbh ) ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
