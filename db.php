@@ -667,7 +667,7 @@ class LudicrousDB extends wpdb {
 				// Connect if necessary or possible
 				$tcp = null;
 				if ( $use_master || ! $tries_remaining || ! $this->check_tcp_responsiveness || true === $tcp = $this->check_tcp_responsiveness( $host, $port, $timeout ) ) {
-					$this->dbhs[$dbhname] = $this->single_db_connect( "$host:$port", $user, $password, true );
+					$this->single_db_connect( $dbhname, "$host:$port", $user, $password );
 				} else {
 					$this->dbhs[$dbhname] = false;
 				}
@@ -788,13 +788,14 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Connect selected database.
 	 *
+	 * @param string $dbhname
 	 * @param string $host     Internet address: host:port of server on internet.
 	 * @param string $user     Database user.
 	 * @param string $password Database password.
 	 *
 	 * @return bool|mysqli|resource
 	 */
-	protected function single_db_connect( $host, $user, $password ) {
+	protected function single_db_connect( $dbhname, $host, $user, $password ) {
 		$this->is_mysql = true;
 
 		/*
@@ -803,8 +804,6 @@ class LudicrousDB extends wpdb {
 		 */
 		$new_link     = defined( 'MYSQL_NEW_LINK' ) ? MYSQL_NEW_LINK : true;
 		$client_flags = defined( 'MYSQL_CLIENT_FLAGS' ) ? MYSQL_CLIENT_FLAGS : 0;
-
-		$dbh = false;
 
 		if ( $this->use_mysqli ) {
 			$dbh = mysqli_init();
@@ -835,10 +834,10 @@ class LudicrousDB extends wpdb {
 				$pre_host = 'p:';
 			}
 
-			mysqli_real_connect( $dbh, $pre_host . $host, $user, $password, null, $port, $socket, $client_flags );
+			mysqli_real_connect( $this->dbhs[ $dbhname ], $pre_host . $host, $user, $password, null, $port, $socket, $client_flags );
 
 			if ( $dbh->connect_errno ) {
-				$dbh = false;
+				$this->dbhs[ $dbhname ] = false;
 
 				/* It's possible ext/mysqli is misconfigured. Fall back to ext/mysql if:
 		 		 *  - We haven't previously connected, and
@@ -857,21 +856,18 @@ class LudicrousDB extends wpdb {
 
 				if ( $attempt_fallback ) {
 					$this->use_mysqli = false;
-
-					return $this->db_connect( $host, $user, $password );
+					$this->db_connect( $dbhname, $host, $user, $password );
 				}
 			}
 		} else {
 			// Check if functions exists, as in PHP 7, they may not.
 			if ( $this->persistent && function_exists( 'mysql_pconnect' ) ) {
-				$dbh = mysql_pconnect( $host, $user, $password, $new_link, $client_flags );
+				$this->dbhs[ $dbhname ] = mysql_pconnect( $host, $user, $password, $new_link, $client_flags );
 			} elseif ( function_exists( 'mysql_connect' ) ) {
-				$dbh = mysql_connect( $host, $user, $password, $new_link, $client_flags );
+				$this->dbhs[ $dbhname ] = mysql_connect( $host, $user, $password, $new_link, $client_flags );
 			}
 
 		}
-
-		return $dbh;
 	}
 
 
