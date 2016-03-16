@@ -863,6 +863,9 @@ class LudicrousDB extends wpdb {
 	 */
 	public function set_sql_mode( $modes = array(), $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
+		if ( $this->dbh_type_check( $dbh ) ) {
+			return;
+		}
 		if ( empty( $modes ) ) {
 			if ( $this->use_mysqli ) {
 				$res = mysqli_query( $dbh, 'SELECT @@SESSION.sql_mode' );
@@ -918,7 +921,9 @@ class LudicrousDB extends wpdb {
 	 */
 	public function select( $db, $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
-
+		if ( ! $this->dbh_type_check( $dbh ) ) {
+			return false;
+		}
 		if ( $this->use_mysqli ) {
 			$success = mysqli_select_db( $dbh, $db );
 		} else {
@@ -1046,6 +1051,7 @@ class LudicrousDB extends wpdb {
 
 		$dbh = $this->get_db_object( $dbh_or_table );
 
+		if ( $this->dbh_type_check( $dbh ) ) {
 			if ( $this->use_mysqli ) {
 				if ( mysqli_ping( $dbh ) ) {
 					return true;
