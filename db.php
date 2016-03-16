@@ -1046,7 +1046,6 @@ class LudicrousDB extends wpdb {
 
 		$dbh = $this->get_db_object( $dbh_or_table );
 
-		if ( ! empty( $dbh ) ) {
 			if ( $this->use_mysqli ) {
 				if ( mysqli_ping( $dbh ) ) {
 					return true;
