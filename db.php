@@ -720,19 +720,25 @@ class LudicrousDB extends wpdb {
 				$this->last_connection  = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success' );
 				$this->db_connections[] = $this->last_connection;
 
-				if ( $this->use_mysqli ) {
-					$error = mysqli_error( $this->dbhs[ $dbhname ] );
-					$errno = mysqli_errno( $this->dbhs[ $dbhname ] );
-				} else {
-					$error = mysql_error( $this->dbhs[ $dbhname ] );
-					$errno = mysql_errno( $this->dbhs[ $dbhname ] );
+				if ( $this->dbh_type_check( $this->dbhs[ $dbhname ] ) ) {
+					if ( $this->use_mysqli ) {
+						$error = mysqli_error( $this->dbhs[ $dbhname ] );
+						$errno = mysqli_errno( $this->dbhs[ $dbhname ] );
+					} else {
+						$error = mysql_error( $this->dbhs[ $dbhname ] );
+						$errno = mysql_errno( $this->dbhs[ $dbhname ] );
+					}
 				}
 
 				$msg = date( "Y-m-d H:i:s" ) . " Can't select $dbhname - \n";
 				$msg .= "'referrer' => '{$_SERVER['HTTP_HOST']}{$_SERVER['REQUEST_URI']}',\n";
 				$msg .= "'host' => {$host},\n";
-				$msg .= "'error' => " . $error . ",\n";
-				$msg .= "'errno' => " . $errno . ",\n";
+				if ( ! empty( $error ) ) {
+					$msg .= "'error' => " . $error . ",\n";
+				}
+				if ( ! empty( $errno ) ) {
+					$msg .= "'errno' => " . $errno . ",\n";
+				}
 				$msg .= "'tcp_responsive' => " . ( $tcp === true
 						? 'true'
 						: $tcp ) . ",\n";
@@ -1221,10 +1227,12 @@ class LudicrousDB extends wpdb {
 		}
 
 		// If there is an error then take note of it
-		if ( $this->use_mysqli ) {
-			$this->last_error = mysqli_error( $this->dbh );
-		} else {
-			$this->last_error = mysql_error( $this->dbh );
+		if ( $this->dbh_type_check( $this->dbh ) ) {
+			if ( $this->use_mysqli ) {
+				$this->last_error = mysqli_error( $this->dbh );
+			} else {
+				$this->last_error = mysql_error( $this->dbh );
+			}
 		}
 
 		if ( ! empty( $this->last_error ) ) {
