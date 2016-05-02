@@ -978,7 +978,7 @@ class LudicrousDB extends wpdb {
 		if ( ! $this->dbh_type_check( $dbh ) ) {
 			return false;
 		}
-	
+
 		if ( true === $this->use_mysqli ) {
 			$success = mysqli_select_db( $dbh, $db );
 		} else {
