@@ -64,8 +64,8 @@ function ldb_add_db_server( $dataset, $part, $dc, $read, $write, $host, $lhost, 
 	// trying to connect to local servers before remote servers. Also
 	// increases time allowed for TCP responsiveness check.
 	if ( ! empty( $dc ) && defined( DATACENTER ) && ( DATACENTER !== $dc ) ) {
-		$read += 10000;
-		$write += 10000;
+		$read   += 10000;
+		$write  += 10000;
 		$timeout = 0.7;
 	}
 
@@ -77,7 +77,8 @@ function ldb_add_db_server( $dataset, $part, $dc, $read, $write, $host, $lhost, 
 
 	$GLOBALS['wpdb']->add_database( $database );
 
-	if ( defined( 'DATACENTER' ) && $dc === DATACENTER ) {
+	if ( defined( 'DATACENTER' ) && ( $dc === DATACENTER ) ) {
+
 		// lhost is not used in LudicrousDB. This configures LudicrousDB with an
 		// additional server to represent the local hostname so it tries to
 		// connect over the private interface before the public one.
@@ -101,8 +102,8 @@ function ldb_add_db_server( $dataset, $part, $dc, $read, $write, $host, $lhost, 
 /**
  * Common definitions
  */
-define( 'DB_LAG_OK', 1 );
-define( 'DB_LAG_BEHIND', 2 );
+define( 'DB_LAG_OK',      1 );
+define( 'DB_LAG_BEHIND',  2 );
 define( 'DB_LAG_UNKNOWN', 3 );
 
 class LudicrousDB extends wpdb {
@@ -197,17 +198,7 @@ class LudicrousDB extends wpdb {
 	public $check_tcp_responsiveness = true;
 
 	/**
-	 * Minimum number of connections to try before bailing
-	 *
-	 * @public int
-	 */
-	public $min_tries = 3;
-
-
-	/**
 	 * The number of times to retry reconnecting before dying
-	 *
-	 * Added for backwards compat
 	 *
 	 * @access protected
 	 * @see wpdb::check_connection()
@@ -296,9 +287,6 @@ class LudicrousDB extends wpdb {
 				$this->use_mysqli = true;
 			}
 		}
-
-		// Set reconnect to minimum
-		$this->reconnect_retries = $this->min_tries;
 
 		// Maybe override class vars
 		if ( is_array( $args ) ) {
