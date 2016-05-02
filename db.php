@@ -279,7 +279,7 @@ class LudicrousDB extends wpdb {
 		// Set reconnect to minimum
 		$this->reconnect_retries = $this->min_tries;
 
-		// Maybe override class vars 
+		// Maybe override class vars
 		if ( is_array( $args ) ) {
 			$class_vars = array_keys( get_class_vars( __CLASS__ ) );
 			foreach ( $class_vars as $var ) {
@@ -1530,6 +1530,8 @@ class LudicrousDB extends wpdb {
 	 * @return (bool) true when $host:$post responds within $float_timeout seconds, else (bool) false
 	 */
 	public function check_tcp_responsiveness( $host, $port, $float_timeout ) {
+
+		// Using APC?
 		if ( function_exists( 'apc_store' ) ) {
 			$use_apc = true;
 			$apc_key = "{$host}{$port}";
@@ -1538,7 +1540,8 @@ class LudicrousDB extends wpdb {
 			$use_apc = false;
 		}
 
-		if ( $use_apc ) {
+		// Using API
+		if ( true === $use_apc ) {
 			$cached_value = apc_fetch( $apc_key );
 			switch ( $cached_value ) {
 				case 'up':
@@ -1552,18 +1555,30 @@ class LudicrousDB extends wpdb {
 			}
 		}
 
-		$socket = @fsockopen( $host, $port, $errno, $errstr, $float_timeout );
+		// Defaults
+		$errno  = 0;
+		$errstr = '';
+
+		if ( WP_DEBUG ) {
+			$socket = fsockopen( $host, $port, $errno, $errstr, $float_timeout );
+		} else {
+			$socket = @fsockopen( $host, $port, $errno, $errstr, $float_timeout );
+		}
+
+		// No socket
 		if ( $socket === false ) {
-			if ( $use_apc ) {
+			if ( true === $use_apc ) {
 				apc_store( $apc_key, 'down', $apc_ttl );
 			}
 
-			return "[ > $float_timeout ] ($errno) '$errstr'";
+			return "[ > {$float_timeout} ] ({$errno}) '{$errstr}'";
 		}
 
+		// Close the socket
 		fclose( $socket );
 
-		if ( $use_apc ) {
+		// Using API
+		if ( true === $use_apc ) {
 			apc_store( $apc_key, 'up', $apc_ttl );
 		}
 
