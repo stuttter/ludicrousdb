@@ -276,17 +276,20 @@ class LudicrousDB extends wpdb {
 			}
 		}
 
-
+		// Set reconnect to minimum
 		$this->reconnect_retries = $this->min_tries;
 
+		// Maybe override class vars 
 		if ( is_array( $args ) ) {
-			foreach ( get_class_vars( __CLASS__ ) as $var => $value ) {
+			$class_vars = array_keys( get_class_vars( __CLASS__ ) );
+			foreach ( $class_vars as $var ) {
 				if ( isset( $args[ $var ] ) ) {
-					$this->$var = $args[ $var ];
+					$this->{$var} = $args[ $var ];
 				}
 			}
 		}
 
+		// Set collation and character set
 		$this->init_charset();
 	}
 
@@ -295,6 +298,7 @@ class LudicrousDB extends wpdb {
 	 */
 	public function init_charset() {
 		global $wp_version;
+
 		if ( function_exists( 'is_multisite' ) && is_multisite() ) {
 			if ( version_compare( $wp_version, '4.2', '<' ) ) {
 				$this->charset = 'utf8';
