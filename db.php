@@ -1297,16 +1297,17 @@ class LudicrousDB extends wpdb {
 			// Return number of rows affected
 			$return_val = $this->rows_affected;
 		} else {
-			$this->load_col_info();
 			$num_rows          = 0;
 			$this->last_result = array();
 
 			if ( ( true === $this->use_mysqli ) && ( $this->result instanceof mysqli_result ) ) {
+				$this->load_col_info();
 				while ( $row = mysqli_fetch_object( $this->result ) ) {
 					$this->last_result[ $num_rows ] = $row;
 					$num_rows ++;
 				}
 			} elseif ( is_resource( $this->result ) ) {
+				$this->load_col_info();
 				while ( $row = mysql_fetch_object( $this->result ) ) {
 					$this->last_result[ $num_rows ] = $row;
 					$num_rows ++;
