@@ -982,7 +982,7 @@ class LudicrousDB extends wpdb {
 	 * @access protected
 	 */
 	protected function load_col_info() {
-		if ( $this->col_info ) {
+		if ( ! empty( $this->col_info ) || ( false === $this->result ) ) {
 			return;
 		}
 
@@ -1042,7 +1042,7 @@ class LudicrousDB extends wpdb {
 		if ( $this->has_cap( 'collation', $dbh ) && ! empty( $charset ) ) {
 			if ( ( true === $this->use_mysqli ) && function_exists( 'mysqli_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
 				mysqli_set_charset( $dbh, $charset );
-			} else if ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
+			} elseif ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
 				mysql_set_charset( $charset, $dbh );
 			} else {
 				$query = $this->prepare( 'SET NAMES %s', $charset );
@@ -1097,7 +1097,6 @@ class LudicrousDB extends wpdb {
 	 * @return bool|void True if the connection is up.
 	 */
 	public function check_connection( $allow_bail = true, $dbh_or_table = false ) {
-
 		$dbh = $this->get_db_object( $dbh_or_table );
 
 		if ( $this->dbh_type_check( $dbh ) ) {
@@ -1125,11 +1124,13 @@ class LudicrousDB extends wpdb {
 		}
 
 		for ( $tries = 1; $tries <= $this->reconnect_retries; $tries ++ ) {
+
 			// On the last try, re-enable warnings. We want to see a single instance of the
 			// "unable to connect" message on the bail() screen, if it appears.
 			if ( $this->reconnect_retries === $tries && WP_DEBUG ) {
 				error_reporting( $error_reporting );
 			}
+
 			if ( $this->db_connect( false ) ) {
 				if ( $error_reporting ) {
 					error_reporting( $error_reporting );
@@ -1137,6 +1138,7 @@ class LudicrousDB extends wpdb {
 
 				return true;
 			}
+
 			sleep( 1 );
 		}
 
@@ -1333,16 +1335,16 @@ class LudicrousDB extends wpdb {
 	 * @param bool $dbh_or_table
 	 */
 	protected function _do_query( $query, $dbh_or_table = false ) {
+		$dbh = $this->get_db_object( $dbh_or_table );
 
-		$dbh    = $this->get_db_object( $dbh_or_table );
-		$result = false;
+		if ( ! $this->dbh_type_check( $dbh ) ) {
+			return false;
+		}
 
-		if ( $this->dbh_type_check( $dbh ) ) {
-			if ( true === $this->use_mysqli ) {
-				$result = mysqli_query( $dbh, $query );
-			} else {
-				$result = mysql_query( $query, $dbh );
-			}
+		if ( true === $this->use_mysqli ) {
+			$result = mysqli_query( $dbh, $query );
+		} else {
+			$result = mysql_query( $query, $dbh );
 		}
 
 		return $result;
@@ -1473,17 +1475,17 @@ class LudicrousDB extends wpdb {
 	public function db_version( $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
 
-		if ( $this->dbh_type_check( $dbh ) ) {
-			if ( true === $this->use_mysqli ) {
-				$server_info = mysqli_get_server_info( $dbh );
-			} else {
-				$server_info = mysql_get_server_info( $dbh );
-			}
-
-			return preg_replace( '/[^0-9.].*/', '', $server_info );
+		if ( ! $this->dbh_type_check( $dbh ) ) {
+			return false;
 		}
 
-		return false;
+		if ( true === $this->use_mysqli ) {
+			$server_info = mysqli_get_server_info( $dbh );
+		} else {
+			$server_info = mysql_get_server_info( $dbh );
+		}
+
+		return preg_replace( '/[^0-9.].*/', '', $server_info );
 	}
 
 	/**
@@ -1491,13 +1493,21 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
 	 */
-	private function get_db_object( $dbh_or_table ) {
+	private function get_db_object( $dbh_or_table = false ) {
 
+		// No database
+		$dbh = false;
+
+		// Database
 		if ( $this->dbh_type_check( $dbh_or_table ) ) {
 			$dbh = &$dbh_or_table;
-		} elseif ( ! $dbh_or_table && $this->dbh_type_check( $this->dbh ) ) {
+
+		// Database
+		} elseif ( ( false === $dbh_or_table ) && $this->dbh_type_check( $this->dbh ) ) {
 			$dbh = &$this->dbh;
-		} else {
+
+		// Table name
+		} elseif ( is_string( $dbh_or_table ) ) {
 			$dbh = $this->db_connect( "SELECT FROM {$dbh_or_table} {$this->users}" );
 		}
 
@@ -1512,7 +1522,7 @@ class LudicrousDB extends wpdb {
 	private function dbh_type_check( $dbh ) {
 		if ( ( true === $this->use_mysqli ) && ( $dbh instanceof mysqli ) ) {
 			return true;
-		} else if ( is_resource( $dbh ) ) {
+		} elseif ( is_resource( $dbh ) ) {
 			return true;
 		}
 
