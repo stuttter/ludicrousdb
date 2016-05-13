@@ -459,7 +459,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( empty( $dataset ) ) {
-			return $this->bail( "Unable to determine which dataset to query. ($this->table)" );
+			return $this->bail( "Unable to determine which dataset to query. ({$this->table})" );
 		} else {
 			$this->dataset = $dataset;
 		}
@@ -471,9 +471,7 @@ class LudicrousDB extends wpdb {
 				return $this->dbh;
 			}
 
-			if (
-				! defined( 'DB_HOST' ) || ! defined( 'DB_USER' ) || ! defined( 'DB_PASSWORD' ) || ! defined( 'DB_NAME' )
-			) {
+			if ( ! defined( 'DB_HOST' ) || ! defined( 'DB_USER' ) || ! defined( 'DB_PASSWORD' ) || ! defined( 'DB_NAME' ) ) {
 				return $this->bail( "We were unable to query because there was no database defined." );
 			}
 
@@ -498,7 +496,7 @@ class LudicrousDB extends wpdb {
 				$this->srtm[ $this->table ] = true;
 			}
 
-			// Detect queries that have a join in the srtm array.
+		// Detect queries that have a join in the srtm array.
 		} elseif ( ! isset( $use_master ) && is_array( $this->srtm ) && ! empty( $this->srtm ) ) {
 			$use_master  = false;
 			$query_match = substr( $query, 0, 1000 );
@@ -512,7 +510,7 @@ class LudicrousDB extends wpdb {
 			$use_master = false;
 		}
 
-		if ( $use_master ) {
+		if ( ! empty( $use_master ) ) {
 			$this->dbhname = $dbhname = $dataset . '__w';
 			$operation     = 'write';
 		} else {
@@ -584,7 +582,7 @@ class LudicrousDB extends wpdb {
 			return $this->dbhs[ $dbhname ];
 		}
 
-		if ( $use_master && defined( "MASTER_DB_DEAD" ) ) {
+		if ( ! empty( $use_master ) && defined( "MASTER_DB_DEAD" ) ) {
 			return $this->bail( "We're updating the database, please try back in 5 minutes. If you are posting to your blog please hit the refresh button on your browser in a few minutes to post the data again. It will be posted as soon as the database is back online again." );
 		}
 
@@ -945,9 +943,9 @@ class LudicrousDB extends wpdb {
 		$modes_str = implode( ',', $modes );
 
 		if ( true === $this->use_mysqli ) {
-			mysqli_query( $dbh, "SET SESSION sql_mode='$modes_str'" );
+			mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" );
 		} else {
-			mysql_query( "SET SESSION sql_mode='$modes_str'", $dbh );
+			mysql_query( "SET SESSION sql_mode='{$modes_str}'", $dbh );
 		}
 	}
 
