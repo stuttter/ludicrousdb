@@ -1278,7 +1278,9 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		if ( preg_match( "/^\\s*(insert|delete|update|replace|alter) /i", $query ) ) {
+		if ( preg_match( '/^\s*(create|alter|truncate|drop)\s/i', $query ) ) {
+			$return_val = $this->result;
+		} elseif ( preg_match( "/^\\s*(insert|delete|update|replace|alter) /i", $query ) ) {
 			if ( true === $this->use_mysqli ) {
 				$this->rows_affected = mysqli_affected_rows( $this->dbh );
 			} else {
