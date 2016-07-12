@@ -1,17 +1,25 @@
 {
-  "name": "johnjamesjacoby/ludicrousdb",
+  "name": "stuttter/ludicrousdb",
   "description": "LudicrousDB is a database class that supports replication, failover, load balancing, & partitioning, based on Automattic's HyperDB drop-in.",
-  "homepage": "https://github.com/johnjamesjacoby/ludicrousdb",
+  "homepage": "https://github.com/stuttter/ludicrousdb",
   "type": "wordpress-muplugin",
-  "require": {
-    "php": ">=5.2",
-    "composer/installers": "~1.0"
-  },
-  "license": "GPLv2 or later",
+  "license"    : "GPL-2.0+",
   "authors": [
     {
       "name": "John James Jacoby",
       "email": "johnjamesjacoby@me.com"
+    },
+    {
+      "name": "Jonny Harris",
+      "email": "jon@spacedmonkey.co.uk"
     }
-  ]
+  ],
+  "support"    : {
+    "issues": "https://github.com/stuttter/ludicrousdb/issues",
+    "source": "https://github.com/stuttter/ludicrousdb"
+  },
+  "require": {
+    "php": ">=5.2",
+    "composer/installers": "~1.0"
+  }
 }

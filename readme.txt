@@ -1,5 +1,5 @@
 === LudicrousDB ===
-Contributors: matt, andy, ryan, mdawaffe, vnsavage, automattic, johnjamesjacoby
+Contributors: matt, andy, ryan, mdawaffe, vnsavage, automattic, johnjamesjacoby, spacedmonkey
 Tags: mysql, scaling, performance, availability
 Requires at least: 4.2
 Tested up to: 4.3
