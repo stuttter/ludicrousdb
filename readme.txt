@@ -76,6 +76,9 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 
 == Changelog ==
 
+= Next =
+* Fixed wrong return value for `CREATE`, `ALTER`, `TRUNCATE` and `DROP` queries
+
 = 2.0 =
 * Fork from HyperDB
 * Include utf8mb4 support (for WordPress 4.2 compatibility)
