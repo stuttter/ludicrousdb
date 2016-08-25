@@ -316,10 +316,9 @@ class LudicrousDB extends wpdb {
 				$this->charset = 'utf8mb4';
 				$this->collate = 'utf8mb4_unicode_ci';
 			}
-			if ( defined( 'DB_COLLATE' ) && DB_COLLATE ) {
-				$this->collate = DB_COLLATE;
-			}
-		} elseif ( defined( 'DB_COLLATE' ) ) {
+		} 
+		
+		if ( defined( 'DB_COLLATE' ) ) {
 			$this->collate = DB_COLLATE;
 		}
 
