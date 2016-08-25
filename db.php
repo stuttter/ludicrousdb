@@ -1030,7 +1030,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( empty( $charset ) || empty( $collate ) ) {
-			wp_die( $dbh . '  ' . $charset . '  ' . $collate );
+			wp_die( $charset . '  ' . $collate );
 		}
 
 		if ( ! in_array( strtolower( $charset ), array( 'utf8', 'utf8mb4', 'latin1' ) ) ) {
