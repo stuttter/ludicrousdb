@@ -893,7 +893,7 @@ class LudicrousDB extends wpdb {
 	public function set_sql_mode( $modes = array(), $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
 
-		if ( $this->dbh_type_check( $dbh ) ) {
+		if ( ! $this->dbh_type_check( $dbh ) ) {
 			return;
 		}
 
