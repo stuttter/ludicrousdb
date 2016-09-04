@@ -1,41 +1,48 @@
 === LudicrousDB ===
-Contributors: matt, andy, ryan, mdawaffe, vnsavage, automattic, johnjamesjacoby, spacedmonkey
-Tags: mysql, scaling, performance, availability
-Requires at least: 4.2
-Tested up to: 4.3
-Stable tag: 2.0.0
+Contributors: johnjamesjacoby, spacedmonkey
+Tags: mysql, scaling, performance, availability, replication
+Requires at least: 4.6
+Tested up to: 4.7
+Stable tag: 2.0.1
 
-LudicrousDB is a database class that supports replication, failover, load balancing, and partitioning, based on Automattic's HyperDB.
+LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
 
 == Description ==
 
-LudicrousDB is a very advanced database class that replaces a few of the WordPress built-in database functions. The main differences are:
-* LudicrousDB can be connect to an arbitrary number of database servers,
-* LudicrousDB inspects each query to determine the appropriate database.
+LudicrousDB is an advanced database interface for WordPress that replaces much of WordPress's built-in database functionality.
+
+The main differences are:
+
+* Connects to an arbitrary number of database servers
+* Inspects each query to determine the appropriate database
+* Designed specifically for large, multi-site, high-availability environments
 
 It supports:
 
 * Read and write servers (replication)
 * Configurable priority for reading and writing
-* Local and remote datacenters
+* Local and remote data-centers
 * Private and public networks
 * Different tables on different databases/hosts
 * Smart post-write master reads
-* Failover for downed host
+* Fail-over for downed host
 * Advanced statistics for profiling
 
-It is based on the code currently used in production on WordPress.org with many MySQL servers spanning multiple datacenters.
+It is based on the code currently used in production on WordPress.com & WordPress.org, with many database servers spanning multiple data-centers.
+
+It is a fork of Automattic's HyperDB.
+
+= Previous Contributors =
+
+HyperDB's original contributors: matt, andy, ryan, mdawaffe, vnsavage, automattic
 
 == Installation ==
 
 Nothing goes in the plugins directory.
 
 1. Enter a configuration in `db-config.php`.
-
 2. Deploy `db-config.php` in the directory that holds `wp-config.php`. This may be the WordPress root or one level above. It may also be anywhere else the web server can see it; in this case, define `DB_CONFIG_FILE` in `wp-config.php`.
-
 3. Deploy `db.php` to the `/wp-content/` directory. Simply placing this file activates it. To deactivate it, move it from that location or move the config file.
-
 4. Optional - deploy `db-error.php` to the `/wp-content/` directory. This file is used when database connections critically fail.
 
 Any value of `WP_USE_MULTIPLE_DB` will be ignored by LudicrousDB.
@@ -76,20 +83,22 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 
 == Changelog ==
 
-= Next =
+= 2.1.0 =
 * Fixed wrong return value for `CREATE`, `ALTER`, `TRUNCATE` and `DROP` queries
+* Merge improvements from WordPress core WPDB
+* Undefined variable fixes
 
-= 2.0 =
+= 2.0.0 =
 * Fork from HyperDB
 * Include utf8mb4 support (for WordPress 4.2 compatibility)
 * Remove support for WPDB_PATH as require_wp_db() prevents it
 
-= 1.1 =
+= 1.1.0 =
 * Extended callbacks functionality
 * Added connection error callback
 * Added replication lag detection support
 
-= 1.0 =
+= 1.0.0 =
 * Removed support for WPMU and BackPress.
 * New class with inheritance: hyperdb extends wpdb.
 * New instantiation scheme: $wpdb = new hyperdb(); then include config. No more $db_* globals.

@@ -5,7 +5,7 @@
  * Author:      johnjamesjacoby
  * Plugin URI:  https://github.com/johnjamesjacoby/ludicrousdb
  * Description: An advanced database class that supports replication, failover, load balancing, and partitioning.
- * Version:     2.0.0
+ * Version:     2.1.0
  */
 
 // Exit if accessed directly
