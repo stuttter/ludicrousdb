@@ -113,7 +113,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @var string
 	 */
-	public $last_table;
+	public $last_table = '';
 
 	/**
 	 * After any SQL_CALC_FOUND_ROWS query, the query "SELECT FOUND_ROWS()"
@@ -124,7 +124,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @var resource
 	 */
-	public $last_found_rows_result;
+	public $last_found_rows_result = null;
 
 	/**
 	 * Whether to store queries in an array. Useful for debugging and profiling
@@ -145,7 +145,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @var array
 	 */
-	public $dbhs;
+	public $dbhs = array();
 
 	/**
 	 * The multi-dimensional array of datasets and servers
@@ -219,7 +219,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @public array
 	 */
-	public $db_connections;
+	public $db_connections = array();
 
 	/**
 	 * The list of unclosed connections sorted by LRU
@@ -238,7 +238,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @public array
 	 */
-	public $last_used_server;
+	public $last_used_server = array();
 
 	/**
 	 * Lookup array (dbhname => (server, db name) ) for re-selecting the db
@@ -437,7 +437,7 @@ class LudicrousDB extends wpdb {
 			$dataset               = $this->ludicrous_tables[ $this->table ];
 			$this->callback_result = null;
 
-			// Run callbacks and either extract or update dataset
+		// Run callbacks and either extract or update dataset
 		} else {
 
 			// Run callbacks and get result
@@ -471,7 +471,7 @@ class LudicrousDB extends wpdb {
 			}
 
 			if ( ! defined( 'DB_HOST' ) || ! defined( 'DB_USER' ) || ! defined( 'DB_PASSWORD' ) || ! defined( 'DB_NAME' ) ) {
-				return $this->bail( "We were unable to query because there was no database defined." );
+				return $this->bail( 'We were unable to query because there was no database defined.' );
 			}
 
 			// Fallback to wpdb db_connect method.
@@ -487,7 +487,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Determine whether the query must be sent to the master (a writable server)
-		if ( ! empty( $use_master ) || $this->srtm === true || isset( $this->srtm[ $this->table ] ) ) {
+		if ( ! empty( $use_master ) || ( $this->srtm === true ) || isset( $this->srtm[ $this->table ] ) ) {
 			$use_master = true;
 		} elseif ( $is_write = $this->is_write_query( $query ) ) {
 			$use_master = true;
@@ -499,6 +499,7 @@ class LudicrousDB extends wpdb {
 		} elseif ( ! isset( $use_master ) && is_array( $this->srtm ) && ! empty( $this->srtm ) ) {
 			$use_master  = false;
 			$query_match = substr( $query, 0, 1000 );
+
 			foreach ( $this->srtm as $key => $value ) {
 				if ( false !== stripos( $query_match, $key ) ) {
 					$use_master = true;
@@ -582,11 +583,11 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( ! empty( $use_master ) && defined( "MASTER_DB_DEAD" ) ) {
-			return $this->bail( "We're updating the database, please try back in 5 minutes. If you are posting to your blog please hit the refresh button on your browser in a few minutes to post the data again. It will be posted as soon as the database is back online again." );
+			return $this->bail( "We are updating the database. Please try back in 5 minutes. If you are posting to your blog please hit the refresh button on your browser in a few minutes to post the data again. It will be posted as soon as the database is back online." );
 		}
 
 		if ( empty( $this->ludicrous_servers[ $dataset ][ $operation ] ) ) {
-			return $this->bail( "No databases available with $this->table ($dataset)" );
+			return $this->bail( "No databases available with {$this->table} ({$dataset})" );
 		}
 
 		// Put the groups in order by priority
@@ -604,7 +605,7 @@ class LudicrousDB extends wpdb {
 			}
 
 			if ( ! $tries_remaining = count( $servers ) ) {
-				return $this->bail( "No database servers were found to match the query. ($this->table, $dataset)" );
+				return $this->bail( "No database servers were found to match the query. ({$this->table}, {$dataset})" );
 			}
 
 			if ( ! isset( $unique_servers ) ) {
@@ -671,7 +672,7 @@ class LudicrousDB extends wpdb {
 					: $this->default_lag_threshold;
 
 				// Check for a lagged slave, if applicable
-				if ( ! $use_master && ! $write && ! isset( $ignore_slave_lag ) && isset( $this->lag_threshold ) && ! isset( $server['host'] ) && ( $lagged_status = $this->get_lag_cache() ) === DB_LAG_BEHIND ) {
+				if ( empty( $use_master ) && empty( $write ) && ! isset( $ignore_slave_lag ) && isset( $this->lag_threshold ) && ! isset( $server['host'] ) && ( $lagged_status = $this->get_lag_cache() ) === DB_LAG_BEHIND ) {
 
 					// If it is the last lagged slave and it is with the best preference we will ignore its lag
 					if ( ! isset( $unique_lagged_slaves[ $host_and_port ] ) && $unique_servers == count( $unique_lagged_slaves ) + 1 && $group == $min_group ) {
@@ -686,7 +687,11 @@ class LudicrousDB extends wpdb {
 
 				// Connect if necessary or possible
 				$tcp = null;
-				if ( $use_master || ! $tries_remaining || ! $this->check_tcp_responsiveness || true === $tcp = $this->check_tcp_responsiveness( $host, $port, $timeout ) ) {
+				if ( ! empty( $use_master )
+					|| empty( $tries_remaining )
+					|| empty( $this->check_tcp_responsiveness )
+					|| ( true === $tcp = $this->check_tcp_responsiveness( $host, $port, $timeout ) )
+				) {
 					$this->single_db_connect( $dbhname, $host_and_port, $user, $password );
 				} else {
 					$this->dbhs[ $dbhname ] = false;
@@ -699,30 +704,38 @@ class LudicrousDB extends wpdb {
 					 * If we care about lag, disconnect lagged slaves and try to find others.
 					 * We don't disconnect if it is the last lagged slave and it is with the best preference.
 					 */
-					if ( ! $use_master && ! $write && ! isset( $ignore_slave_lag ) && isset( $this->lag_threshold ) && ! isset( $server['host'] ) && ( $lagged_status !== DB_LAG_OK ) && ( $lagged_status = $this->get_lag() ) === DB_LAG_BEHIND && ! (
-							! isset( $unique_lagged_slaves[ $host_and_port ] ) && $unique_servers == count( $unique_lagged_slaves ) + 1 && $group == $min_group
+					if (   empty( $use_master )
+						&& empty( $write )
+						&& ! isset( $ignore_slave_lag )
+						&& isset( $this->lag_threshold )
+						&& ! isset( $server['host'] )
+						&& ( $lagged_status !== DB_LAG_OK )
+						&& ( $lagged_status = $this->get_lag() ) === DB_LAG_BEHIND && ! (
+							! isset( $unique_lagged_slaves[ $host_and_port ] )
+							&& ( $unique_servers == ( count( $unique_lagged_slaves ) + 1 ) )
+							&& ( $group == $min_group )
 						)
 					) {
-						$success                                = false;
 						$unique_lagged_slaves[ $host_and_port ] = $this->lag;
 						$this->disconnect( $dbhname );
 						$this->dbhs[ $dbhname ] = false;
+						$success                = false;
 						$msg                    = "Replication lag of {$this->lag}s on {$host_and_port} ({$dbhname})";
 						$this->print_error( $msg );
 						continue;
 					} else {
 						$this->set_sql_mode( array(), $this->dbhs[ $dbhname ] );
 						if ( $this->select( $name, $this->dbhs[ $dbhname ] ) ) {
-							$success                    = true;
 							$this->current_host         = $host_and_port;
 							$this->dbh2host[ $dbhname ] = $host_and_port;
+							$this->last_connection      = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
+							$this->db_connections[]     = $this->last_connection;
+							$this->open_connections[]   = $dbhname;
+							$success                    = true;
 							$queries                    = 1;
 							$lag                        = isset( $this->lag )
 								? $this->lag
 								: 0;
-							$this->last_connection      = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
-							$this->db_connections[]     = $this->last_connection;
-							$this->open_connections[]   = $dbhname;
 							break;
 						}
 					}
@@ -742,18 +755,22 @@ class LudicrousDB extends wpdb {
 					}
 				}
 
-				$msg = date( "Y-m-d H:i:s" ) . " Can't select $dbhname - \n";
+				$msg = date( "Y-m-d H:i:s" ) . " Can't select {$dbhname} - \n";
 				$msg .= "'referrer' => '{$_SERVER['HTTP_HOST']}{$_SERVER['REQUEST_URI']}',\n";
 				$msg .= "'host' => {$host},\n";
+
 				if ( ! empty( $error ) ) {
-					$msg .= "'error' => " . $error . ",\n";
+					$msg .= "'error' => {$error},\n";
 				}
+
 				if ( ! empty( $errno ) ) {
-					$msg .= "'errno' => " . $errno . ",\n";
+					$msg .= "'errno' => {$errno},\n";
 				}
+
 				$msg .= "'tcp_responsive' => " . ( $tcp === true
 						? 'true'
 						: $tcp ) . ",\n";
+
 				$msg .= "'lagged_status' => " . ( isset( $lagged_status )
 						? $lagged_status
 						: DB_LAG_UNKNOWN );
@@ -761,7 +778,10 @@ class LudicrousDB extends wpdb {
 				$this->print_error( $msg );
 			}
 
-			if ( ! $success || ! isset( $this->dbhs[ $dbhname ] ) || ! $this->dbh_type_check( $this->dbhs[ $dbhname ] ) ) {
+			if (   empty( $success )
+				|| ! isset( $this->dbhs[ $dbhname ] )
+				|| ! $this->dbh_type_check( $this->dbhs[ $dbhname ] )
+			) {
 
 				// Lagged slaves were not used. Ignore the lag for this connection attempt and retry.
 				if ( ! isset( $ignore_slave_lag ) && count( $unique_lagged_slaves ) ) {
@@ -1029,11 +1049,11 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( empty( $charset ) || empty( $collate ) ) {
-			wp_die( $charset . '  ' . $collate );
+			wp_die( "{$charset}  {$collate}" );
 		}
 
 		if ( ! in_array( strtolower( $charset ), array( 'utf8', 'utf8mb4', 'latin1' ) ) ) {
-			wp_die( "$charset charset isn't supported in LudicrousDB for security reasons" );
+			wp_die( "{$charset} charset isn't supported in LudicrousDB for security reasons" );
 		}
 
 		if ( $this->has_cap( 'collation', $dbh ) && ! empty( $charset ) ) {
@@ -1198,7 +1218,7 @@ class LudicrousDB extends wpdb {
 		$this->flush();
 
 		// Log how the function was called
-		$this->func_call = "\$db->query(\"$query\")";
+		$this->func_call = "\$db->query(\"{$query}\")";
 
 		// If we're writing to the database, make sure the query will write safely.
 		if ( $this->check_current_query && ! $this->check_ascii( $query ) ) {
@@ -1218,7 +1238,19 @@ class LudicrousDB extends wpdb {
 		// Keep track of the last query for debug..
 		$this->last_query = $query;
 
-		if ( preg_match( '/^\s*SELECT\s+FOUND_ROWS(\s*)/i', $query ) && ( ( ( false === $this->use_mysqli ) && is_resource( $this->last_found_rows_result ) ) || ( ( true === $this->use_mysqli ) && $this->last_found_rows_result instanceof mysqli_result ) ) ) {
+		if ( preg_match( '/^\s*SELECT\s+FOUND_ROWS(\s*)/i', $query )
+			&& (
+					(
+						( false === $this->use_mysqli )
+						&& is_resource( $this->last_found_rows_result )
+					)
+					||
+					(
+						( true === $this->use_mysqli )
+						&& ( $this->last_found_rows_result instanceof mysqli_result )
+					)
+			)
+		) {
 			$this->result = $this->last_found_rows_result;
 			$elapsed      = 0;
 		} else {
@@ -1246,7 +1278,7 @@ class LudicrousDB extends wpdb {
 				$this->last_found_rows_result = null;
 			}
 
-			if ( $this->save_queries || ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) ) {
+			if ( ! empty( $this->save_queries ) || ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) ) {
 				if ( is_callable( $this->save_query_callback ) ) {
 					$this->queries[] = call_user_func_array( $this->save_query_callback, array(
 						$query,
