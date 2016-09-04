@@ -1,15 +1,19 @@
 <?php
 
 /**
- * Plugin name: LudicrousDB
- * Author:      johnjamesjacoby
- * Plugin URI:  https://github.com/johnjamesjacoby/ludicrousdb
+ * Plugin Name: LudicrousDB
+ * Plugin URI:  https://github.com/stuttter/ludicrousdb
+ * Author:      John James Jacoby
+ * Author URI:  https://github.com/stuttter/
+ * License:     GPLv2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Description: An advanced database class that supports replication, failover, load balancing, and partitioning.
  * Version:     2.1.0
+ * Text Domain: ludacrousdb
  */
 
 // Exit if accessed directly
-defined( 'ABSPATH' ) || exit();
+defined( 'ABSPATH' ) || exit;
 
 // The config file was defined earlier.
 if ( defined( 'DB_CONFIG_FILE' ) && file_exists( DB_CONFIG_FILE ) ) {
@@ -1167,20 +1171,20 @@ class LudicrousDB extends wpdb {
 
 		wp_load_translations_early();
 
-		$message = '<h1>' . __( 'Error reconnecting to the database' ) . "</h1>\n";
+		$message = '<h1>' . __( 'Error reconnecting to the database', 'ludacrousdb' ) . "</h1>\n";
 		$message .= '<p>' . sprintf(
 			/* translators: %s: database host */
-				__( 'This means that we lost contact with the database server at %s. This could mean your host&#8217;s database server is down.' ),
+				__( 'This means that we lost contact with the database server at %s. This could mean your host&#8217;s database server is down.', 'ludacrousdb' ),
 				'<code>' . htmlspecialchars( $this->dbhost, ENT_QUOTES ) . '</code>'
 			) . "</p>\n";
 		$message .= "<ul>\n";
-		$message .= '<li>' . __( 'Are you sure that the database server is running?' ) . "</li>\n";
-		$message .= '<li>' . __( 'Are you sure that the database server is not under particularly heavy load?' ) . "</li>\n";
+		$message .= '<li>' . __( 'Are you sure that the database server is running?', 'ludacrousdb' ) . "</li>\n";
+		$message .= '<li>' . __( 'Are you sure that the database server is not under particularly heavy load?', 'ludacrousdb' ) . "</li>\n";
 		$message .= "</ul>\n";
 		$message .= '<p>' . sprintf(
 			/* translators: %s: support forums URL */
-				__( 'If you&#8217;re unsure what these terms mean you should probably contact your host. If you still need help you can always visit the <a href="%s">WordPress Support Forums</a>.' ),
-				__( 'https://wordpress.org/support/' )
+				__( 'If you&#8217;re unsure what these terms mean you should probably contact your host. If you still need help you can always visit the <a href="%s">WordPress Support Forums</a>.', 'ludacrousdb' ),
+				__( 'https://wordpress.org/support/', 'ludacrousdb' )
 			) . "</p>\n";
 
 		// We weren't able to reconnect, so we better bail.
@@ -1426,7 +1430,7 @@ class LudicrousDB extends wpdb {
 		// Make sure the server has the required MySQL version
 		$mysql_version = preg_replace( '|[^0-9\.]|', '', $this->db_version( $dbh_or_table ) );
 		if ( version_compare( $mysql_version, $required_mysql_version, '<' ) ) {
-			return new WP_Error( 'database_version', sprintf( __( '<strong>ERROR</strong>: WordPress %1$s requires MySQL %2$s or higher' ), $wp_version, $required_mysql_version ) );
+			return new WP_Error( 'database_version', sprintf( __( '<strong>ERROR</strong>: WordPress %1$s requires MySQL %2$s or higher', 'ludacrousdb' ), $wp_version, $required_mysql_version ) );
 		}
 	}
 
