@@ -82,6 +82,8 @@ function my_db_callback( $query, $wpdb ) {
 
 ## Configuration Functions
 
+### add_database()
+
 ```
 $wpdb->add_database( $database );
 ```
@@ -103,11 +105,15 @@ lag_threshold (optional) The minimum lag on a slave in seconds before we conside
                          Set null to disable. When not set, the value of $wpdb->default_lag_threshold is used.
 ```
 
+### add_table()
+
 ```
 $wpdb->add_table( $dataset, $table );
 ```
 
 `$dataset` and `$table` are strings.
+
+### add_callback()
 
 ```
 $wpdb->add_callback( $callback, $callback_group = 'dataset' );
