@@ -3,12 +3,14 @@
 /**
  * LudicrousDB configuration file
  *
- * This file should be copied to ABSPATH/db-config.php
- *
- * $wpdb is an instance of the LudicrousDB class which extends the wpdb class.
+ * This file should be copied to ABSPATH/db-config.php and modified to suit your
+ * database environment. This file comes with a basic configuration by default.
  *
  * See README.md for documentation.
  */
+
+// Exit if accessed directly
+defined( 'ABSPATH' ) || exit;
 
 /**
  * charset (string)
