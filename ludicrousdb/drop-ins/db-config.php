@@ -11,6 +11,25 @@
  */
 
 /**
+ * charset (string)
+ * This sets the default character set. Since WordPress 4.2, the suggested
+ * setting is "utf8mb4". We strongly recommend not downgrading to utf8,
+ * using latin1, or sticking to the default: utf8mb4.
+ *
+ * Default: utf8mb4
+ */
+$wpdb->charset = 'utf8mb4';
+
+/**
+ * collate (string)
+ * This sets the default column collation. For best results, investigate which
+ * collation is recommended for your specific character set.
+ *
+ * Default: utf8mb4_unicode_ci
+ */
+$wpdb->collate = 'utf8mb4_unicode_ci';
+
+/**
  * save_queries (bool)
  * This is useful for debugging. Queries are saved in $wpdb->queries. It is not
  * a constant because you might want to use it momentarily.
