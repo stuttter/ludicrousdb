@@ -214,18 +214,18 @@ $wpdb->check_tcp_responsiveness = true;
  * This adds the DB defined in wp-config.php as a read/write server for
  * the 'global' dataset. (Every table is in 'global' by default.)
  */
-$wpdb->add_database(array(
+$wpdb->add_database( array(
 	'host'     => DB_HOST,     // If port is other than 3306, use host:port.
 	'user'     => DB_USER,
 	'password' => DB_PASSWORD,
 	'name'     => DB_NAME,
-));
+) );
 
 /**
  * This adds the same server again, only this time it is configured as a slave.
  * The last three parameters are set to the defaults but are shown for clarity.
  */
-$wpdb->add_database(array(
+$wpdb->add_database( array(
 	'host'     => DB_HOST,     // If port is other than 3306, use host:port.
 	'user'     => DB_USER,
 	'password' => DB_PASSWORD,
@@ -234,7 +234,7 @@ $wpdb->add_database(array(
 	'read'     => 1,
 	'dataset'  => 'global',
 	'timeout'  => 0.2,
-));
+) );
 
 /** Sample Configuration 2: Partitioning **/
 

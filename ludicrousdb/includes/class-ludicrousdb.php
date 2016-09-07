@@ -1,114 +1,7 @@
 <?php
 
-/**
- * Plugin Name: LudicrousDB
- * Plugin URI:  https://github.com/stuttter/ludicrousdb
- * Author:      John James Jacoby
- * Author URI:  https://github.com/stuttter/
- * License:     GPLv2 or later
- * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Description: An advanced database class that supports replication, failover, load balancing, and partitioning.
- * Version:     2.1.0
- * Text Domain: ludacrousdb
- */
-
 // Exit if accessed directly
 defined( 'ABSPATH' ) || exit;
-
-// The config file was defined earlier.
-if ( defined( 'DB_CONFIG_FILE' ) && file_exists( DB_CONFIG_FILE ) ) {
-	// Do nothing here
-
-// The config file resides in ABSPATH.
-} elseif ( file_exists( ABSPATH . 'db-config.php' ) ) {
-	define( 'DB_CONFIG_FILE', ABSPATH . 'db-config.php' );
-
-// The config file resides one level above ABSPATH but is not part of
-// another install.
-} elseif ( file_exists( dirname( ABSPATH ) . '/db-config.php' ) && ! file_exists( dirname( ABSPATH ) . '/wp-settings.php' ) ) {
-	define( 'DB_CONFIG_FILE', dirname( ABSPATH ) . '/db-config.php' );
-
-// Lacking a config file, revert to the standard database class.
-} else {
-	$wpdb = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
-
-	return;
-}
-
-/**
- * Add a database table
- *
- * @param  string  $dataset
- * @param  string  $table
- */
-function ldb_add_db_table( $dataset, $table ) {
-	$GLOBALS['wpdb']->add_table( $dataset, $table );
-}
-
-/**
- * This is back-compatible with an older config style. It is for convenience.
- *
- * lhost, part, and dc were removed from LudicrousDB because the read and write
- * parameters provide enough power to achieve the desired effects via config.
- *
- * @param  string  $dataset  Datset:           the name of the dataset. Just use "global" if you don't need horizontal partitioning.
- * @param  int     $part     Partition:        the vertical partition number (1, 2, 3, etc.). Use "0" if you don't need vertical partitioning.
- * @param  string  $dc       Datacenter:       where the database server is located. Airport codes are convenient. Use whatever.
- * @param  int     $read     Read group:       tries all servers in lowest number group before trying higher number group. Typical: 1 for slaves, 2 for master. This will cause reads to go to slaves unless al$
- * @param  bool    $write    Write flag:       is this server writable? Works the same as $read. Typical: 1 for master, 0 for slaves.
- * @param  string  $host     Internet address: host:port of server on internet.
- * @param  string  $lhost    Local address:    host:port of server for use when in same datacenter. Leave empty if no local address exists.
- * @param  string  $name     Database name.
- * @param  string  $user     Database user.
- * @param  string  $password Database password.
- */
-function ldb_add_db_server( $dataset, $part, $dc, $read, $write, $host, $lhost, $name, $user, $password, $timeout = 0.2 ) {
-
-	// dc is not used in LudicrousDB. This produces the desired effect of
-	// trying to connect to local servers before remote servers. Also
-	// increases time allowed for TCP responsiveness check.
-	if ( ! empty( $dc ) && defined( DATACENTER ) && ( DATACENTER !== $dc ) ) {
-		$read   += 10000;
-		$write  += 10000;
-		$timeout = 0.7;
-	}
-
-	if ( ! empty( $part ) ) {
-		$dataset = $dataset . '_' . $part;
-	}
-
-	$database = compact( 'dataset', 'read', 'write', 'host', 'name', 'user', 'password', 'timeout' );
-
-	$GLOBALS['wpdb']->add_database( $database );
-
-	if ( defined( 'DATACENTER' ) && ( $dc === DATACENTER ) ) {
-
-		// lhost is not used in LudicrousDB. This configures LudicrousDB with an
-		// additional server to represent the local hostname so it tries to
-		// connect over the private interface before the public one.
-		if ( ! empty( $lhost ) ) {
-
-			$database['host'] = $lhost;
-
-			if ( ! empty( $read ) ) {
-				$database['read'] = $read - 0.5;
-			}
-
-			if ( ! empty( $write ) ) {
-				$database['write'] = $write - 0.5;
-			}
-
-			$GLOBALS['wpdb']->add_database( $database );
-		}
-	}
-}
-
-/**
- * Common definitions
- */
-define( 'DB_LAG_OK',      1 );
-define( 'DB_LAG_BEHIND',  2 );
-define( 'DB_LAG_UNKNOWN', 3 );
 
 class LudicrousDB extends wpdb {
 
@@ -320,8 +213,8 @@ class LudicrousDB extends wpdb {
 				$this->charset = 'utf8mb4';
 				$this->collate = 'utf8mb4_unicode_ci';
 			}
-		} 
-		
+		}
+
 		if ( defined( 'DB_COLLATE' ) ) {
 			$this->collate = DB_COLLATE;
 		}
@@ -1171,20 +1064,20 @@ class LudicrousDB extends wpdb {
 
 		wp_load_translations_early();
 
-		$message = '<h1>' . __( 'Error reconnecting to the database', 'ludacrousdb' ) . "</h1>\n";
+		$message = '<h1>' . __( 'Error reconnecting to the database', 'ludicrousdb' ) . "</h1>\n";
 		$message .= '<p>' . sprintf(
 			/* translators: %s: database host */
-				__( 'This means that we lost contact with the database server at %s. This could mean your host&#8217;s database server is down.', 'ludacrousdb' ),
+				__( 'This means that we lost contact with the database server at %s. This could mean your host&#8217;s database server is down.', 'ludicrousdb' ),
 				'<code>' . htmlspecialchars( $this->dbhost, ENT_QUOTES ) . '</code>'
 			) . "</p>\n";
 		$message .= "<ul>\n";
-		$message .= '<li>' . __( 'Are you sure that the database server is running?', 'ludacrousdb' ) . "</li>\n";
-		$message .= '<li>' . __( 'Are you sure that the database server is not under particularly heavy load?', 'ludacrousdb' ) . "</li>\n";
+		$message .= '<li>' . __( 'Are you sure that the database server is running?', 'ludicrousdb' ) . "</li>\n";
+		$message .= '<li>' . __( 'Are you sure that the database server is not under particularly heavy load?', 'ludicrousdb' ) . "</li>\n";
 		$message .= "</ul>\n";
 		$message .= '<p>' . sprintf(
 			/* translators: %s: support forums URL */
-				__( 'If you&#8217;re unsure what these terms mean you should probably contact your host. If you still need help you can always visit the <a href="%s">WordPress Support Forums</a>.', 'ludacrousdb' ),
-				__( 'https://wordpress.org/support/', 'ludacrousdb' )
+				__( 'If you&#8217;re unsure what these terms mean you should probably contact your host. If you still need help you can always visit the <a href="%s">WordPress Support Forums</a>.', 'ludicrousdb' ),
+				__( 'https://wordpress.org/support/', 'ludicrousdb' )
 			) . "</p>\n";
 
 		// We weren't able to reconnect, so we better bail.
@@ -1430,7 +1323,7 @@ class LudicrousDB extends wpdb {
 		// Make sure the server has the required MySQL version
 		$mysql_version = preg_replace( '|[^0-9\.]|', '', $this->db_version( $dbh_or_table ) );
 		if ( version_compare( $mysql_version, $required_mysql_version, '<' ) ) {
-			return new WP_Error( 'database_version', sprintf( __( '<strong>ERROR</strong>: WordPress %1$s requires MySQL %2$s or higher', 'ludacrousdb' ), $wp_version, $required_mysql_version ) );
+			return new WP_Error( 'database_version', sprintf( __( '<strong>ERROR</strong>: WordPress %1$s requires MySQL %2$s or higher', 'ludicrousdb' ), $wp_version, $required_mysql_version ) );
 		}
 	}
 
@@ -1840,8 +1733,3 @@ class LudicrousDB extends wpdb {
 		return $row[ 0 ];
 	}
 }
-
-// class LudicrousDB
-$wpdb = new LudicrousDB();
-
-require( DB_CONFIG_FILE );
