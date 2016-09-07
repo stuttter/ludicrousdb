@@ -10,6 +10,64 @@ A dataset is defined as a group of tables that are located in the same database.
 
 Configuring LudicrousDB involves defining databases and datasets. Defining a database involves specifying the server connection details, the dataset it contains, and its capabilities and priorities for reading and writing. Defining a dataset involves specifying its exact table names or registering one or more callback functions that translate table names to datasets.
 
+## Sample Configuration 1: Default Server
+
+This is the most basic way to add a server to LudicrousDB using only the required parameters: host, user, password, name. This adds the DB defined in wp-config.php as a read/write server for the 'global' dataset. (Every table is in 'global' by default.)
+
+```
+$wpdb->add_database( array(
+	'host'     => DB_HOST,     // If port is other than 3306, use host:port.
+	'user'     => DB_USER,
+	'password' => DB_PASSWORD,
+	'name'     => DB_NAME,
+) );
+```
+
+This adds the same server again, only this time it is configured as a slave. The last three parameters are set to the defaults but are shown for clarity.
+
+```
+$wpdb->add_database( array(
+	'host'     => DB_HOST,     // If port is other than 3306, use host:port.
+	'user'     => DB_USER,
+	'password' => DB_PASSWORD,
+	'name'     => DB_NAME,
+	'write'    => 0,
+	'read'     => 1,
+	'dataset'  => 'global',
+	'timeout'  => 0.2,
+) );
+```
+
+## Sample Configuration 2: Partitioning
+
+This example shows a setup where the multisite blog tables have been separated from the global dataset.
+
+```
+$wpdb->add_database( array(
+	'host'     => 'global.db.example.com',
+	'user'     => 'globaluser',
+	'password' => 'globalpassword',
+	'name'     => 'globaldb',
+) );
+
+$wpdb->add_database( array(
+	'host'     => 'blog.db.example.com',
+	'user'     => 'bloguser',
+	'password' => 'blogpassword',
+	'name'     => 'blogdb',
+	'dataset'  => 'blog',
+) );
+
+$wpdb->add_callback( 'my_db_callback' );
+
+// Multisite blog tables are "{$base_prefix}{$blog_id}_*"
+function my_db_callback( $query, $wpdb ) {
+	if ( preg_match("/^{$wpdb->base_prefix}\d+_/i", $wpdb->table) ) {
+		return 'blog';
+	}
+}
+```
+
 ## Configuration Functions
 
 ```
@@ -43,7 +101,7 @@ $wpdb->add_table( $dataset, $table );
 $wpdb->add_callback( $callback, $callback_group = 'dataset' );
 ```
 
-`$callback` is a callable function or method. $callback_group is the group of callbacks, this $callback belongs to.
+`$callback` is a callable function or method. `$callback_group` is the group of callbacks, this `$callback` belongs to.
 
 Callbacks are executed in the order in which they are registered until one of them returns something other than null.
 
@@ -55,7 +113,7 @@ $dataset = $callback($table, &$wpdb);
 
 Anything evaluating to false will cause the query to be aborted.
 
-For more complex setups, the callback may be used to overwrite properties of `$wpdb` or variables within `LudicrousDB::connect_db()`. If a callback returns an array, LudicrousDB will extract the array. It should be an associative array and it should include a `$dataset` value corresponding to a database added with `$wpdb->add_database()`. It may also include $server, which will be extracted to overwrite the parameters of each randomly selected database server prior to connection. This allows you to dynamically vary parameters such as the host, user, password, database name, lag_threshold and TCP check timeout.
+For more complex setups, the callback may be used to overwrite properties of `$wpdb` or variables within `LudicrousDB::connect_db()`. If a callback returns an array, LudicrousDB will extract the array. It should be an associative array and it should include a `$dataset` value corresponding to a database added with `$wpdb->add_database()`. It may also include `$server`, which will be extracted to overwrite the parameters of each randomly selected database server prior to connection. This allows you to dynamically vary parameters such as the host, user, password, database name, lag_threshold and TCP check timeout.
 
 ## Masters and slaves
 
@@ -133,64 +191,6 @@ The first one is called, before connecting to a slave and should return the repl
 
 The second callback is called after a connection to a slave is established. It should return it's replication lag or false, if unknown, based on the connection in `$wpdb->dbhs[ $wpdb->dbhname ]`.
 
-## Sample Configuration 1: Using the Default Server
-
-This is the most basic way to add a server to LudicrousDB using only the required parameters: host, user, password, name. This adds the DB defined in wp-config.php as a read/write server for the 'global' dataset. (Every table is in 'global' by default.)
-
-```
-$wpdb->add_database( array(
-	'host'     => DB_HOST,     // If port is other than 3306, use host:port.
-	'user'     => DB_USER,
-	'password' => DB_PASSWORD,
-	'name'     => DB_NAME,
-) );
-```
-
-This adds the same server again, only this time it is configured as a slave. The last three parameters are set to the defaults but are shown for clarity.
-
-```
-$wpdb->add_database( array(
-	'host'     => DB_HOST,     // If port is other than 3306, use host:port.
-	'user'     => DB_USER,
-	'password' => DB_PASSWORD,
-	'name'     => DB_NAME,
-	'write'    => 0,
-	'read'     => 1,
-	'dataset'  => 'global',
-	'timeout'  => 0.2,
-) );
-```
-
-### Sample Configuration 2: Partitioning
-
-
-This example shows a setup where the multisite blog tables have been separated from the global dataset.
-
-```
-$wpdb->add_database( array(
-	'host'     => 'global.db.example.com',
-	'user'     => 'globaluser',
-	'password' => 'globalpassword',
-	'name'     => 'globaldb',
-) );
-
-$wpdb->add_database( array(
-	'host'     => 'blog.db.example.com',
-	'user'     => 'bloguser',
-	'password' => 'blogpassword',
-	'name'     => 'blogdb',
-	'dataset'  => 'blog',
-) );
-
-$wpdb->add_callback( 'my_db_callback' );
-
-// Multisite blog tables are "{$base_prefix}{$blog_id}_*"
-function my_db_callback( $query, $wpdb ) {
-	if ( preg_match("/^{$wpdb->base_prefix}\d+_/i", $wpdb->table) ) {
-		return 'blog';
-	}
-}
-```
 ## Sample replication lag detection configuration.
 
 To detect replication lag, try mk-heartbeat: (http://www.maatkit.org/doc/mk-heartbeat.html)
