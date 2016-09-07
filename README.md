@@ -10,6 +10,18 @@ A dataset is defined as a group of tables that are located in the same database.
 
 Configuring LudicrousDB involves defining databases and datasets. Defining a database involves specifying the server connection details, the dataset it contains, and its capabilities and priorities for reading and writing. Defining a dataset involves specifying its exact table names or registering one or more callback functions that translate table names to datasets.
 
+## Drop-ins
+
+WordPress supports a few "drop-in" style plugins, used for advanced overriding of a few specific pieces of functionality.
+
+LudicrousDB includes 3 basic database drop-ins:
+
+* `db.php` <-> `wp-content/db.php` - Bootstrap for replacement `$wpdb` object
+* `db-error.php` <-> `wp-content/db-error.php` - Endpoint for fatal database error output to users
+* `db-config.php` <-> `ABSPATH/db-config.php` - For configuring your database environment
+
+You'll probably want to copy these files to their respective locations, and modify them once you're comfortable with what they do and how they work.
+
 ## Sample Configuration 1: Default Server
 
 This is the most basic way to add a server to LudicrousDB using only the required parameters: host, user, password, name. This adds the DB defined in wp-config.php as a read/write server for the 'global' dataset. (Every table is in 'global' by default.)
