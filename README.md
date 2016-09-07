@@ -2,15 +2,18 @@
 
 LudicrousDB is an advanced database class that supports replication, failover, load balancing, and partitioning, based on Automattic's HyperDB drop-in.
 
-## Introduction to LudicrousDB configuration
+## Installation
 
-LudicrousDB can manage connections to a large number of databases. Queries are distributed to appropriate servers by mapping table names to datasets.
+### Files
 
-A dataset is defined as a group of tables that are located in the same database. There may be similarly-named databases containing different tables on different servers. There may also be many replicas of a database on different servers. The term "dataset" removes any ambiguity. Consider a dataset as a group of tables that can be mirrored on many servers.
+Copy the main `ludicrousdb` plugin folder & it's contents to either:
 
-Configuring LudicrousDB involves defining databases and datasets. Defining a database involves specifying the server connection details, the dataset it contains, and its capabilities and priorities for reading and writing. Defining a dataset involves specifying its exact table names or registering one or more callback functions that translate table names to datasets.
+* `wp-content/plugins/ludicrousdb/`
+* `wp-content/mu-plugins/ludicrousdb/`
 
-## Drop-ins
+It does not matter which one; LudicrousDB will figure it out.
+
+### Drop-ins
 
 WordPress supports a few "drop-in" style plugins, used for advanced overriding of a few specific pieces of functionality.
 
@@ -21,6 +24,14 @@ LudicrousDB includes 3 basic database drop-ins:
 * `db-config.php` <-> `ABSPATH/db-config.php` - For configuring your database environment
 
 You'll probably want to copy these files to their respective locations, and modify them once you're comfortable with what they do and how they work.
+
+## Configuration
+
+LudicrousDB can manage connections to a large number of databases. Queries are distributed to appropriate servers by mapping table names to datasets.
+
+A dataset is defined as a group of tables that are located in the same database. There may be similarly-named databases containing different tables on different servers. There may also be many replicas of a database on different servers. The term "dataset" removes any ambiguity. Consider a dataset as a group of tables that can be mirrored on many servers.
+
+Configuring LudicrousDB involves defining databases and datasets. Defining a database involves specifying the server connection details, the dataset it contains, and its capabilities and priorities for reading and writing. Defining a dataset involves specifying its exact table names or registering one or more callback functions that translate table names to datasets.
 
 ## Sample Configuration 1: Default Server
 
