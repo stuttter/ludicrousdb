@@ -3,7 +3,10 @@ Contributors: johnjamesjacoby, spacedmonkey
 Tags: mysql, scaling, performance, availability, replication
 Requires at least: 4.6
 Tested up to: 4.7
-Stable tag: 2.0.1
+Stable tag: 3.0.0
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=9Q4F4EL5YJ62J
 
 LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
 
