@@ -3,7 +3,7 @@
 /**
  * LudicrousDB configuration file
  *
- * This file should be installed at ABSPATH/db-config.php
+ * This file should be copied to ABSPATH/db-config.php
  *
  * $wpdb is an instance of the LudicrousDB class which extends the wpdb class.
  *
