@@ -1547,18 +1547,39 @@ class LudicrousDB extends wpdb {
 		return true;
 	}
 
+	/**
+	 * Run lag cache callbacks and return current lag
+	 *
+	 * @since 2.1.0
+	 *
+	 * @return int
+	 */
 	public function get_lag_cache() {
 		$this->lag = $this->run_callbacks( 'get_lag_cache' );
 
 		return $this->check_lag();
 	}
 
+	/**
+	 * Run lag callbacks and return current lag
+	 *
+	 * @since 2.1.0
+	 *
+	 * @return int
+	 */
 	public function get_lag() {
 		$this->lag = $this->run_callbacks( 'get_lag' );
 
 		return $this->check_lag();
 	}
 
+	/**
+	 * Check lag
+	 *
+	 * @since 2.1.0
+	 *
+	 * @return int
+	 */
 	public function check_lag() {
 		if ( false === $this->lag ) {
 			return DB_LAG_UNKNOWN;
