@@ -86,6 +86,11 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 
 == Changelog ==
 
+= 3.0.0 =
+* Improved support for mu-plugins installation location
+* Remove APC support for TCP responses (use core caching functions instead)
+* Fix typos in documentation
+
 = 2.1.0 =
 * Fixed wrong return value for `CREATE`, `ALTER`, `TRUNCATE` and `DROP` queries
 * Merge improvements from WordPress core WPDB
