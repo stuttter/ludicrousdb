@@ -23,6 +23,10 @@ function ldb_default_constants() {
 	} elseif ( file_exists( ABSPATH . 'db-config.php' ) ) {
 		define( 'DB_CONFIG_FILE', ABSPATH . 'db-config.php' );
 
+	// The config file resides in WP_CONTENT_DIR.
+	} elseif ( file_exists( WP_CONTENT_DIR . '/db-config.php' ) ) {
+		define( 'DB_CONFIG_FILE', WP_CONTENT_DIR . '/db-config.php' );
+
 	// The config file resides one level above ABSPATH but is not part of
 	// another install.
 	} elseif ( file_exists( dirname( ABSPATH ) . '/db-config.php' ) && ! file_exists( dirname( ABSPATH ) . '/wp-settings.php' ) ) {
