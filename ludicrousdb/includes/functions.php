@@ -50,37 +50,42 @@ function ldb_add_db_table( $dataset, $table ) {
  * lhost, part, and dc were removed from LudicrousDB because the read and write
  * parameters provide enough power to achieve the desired effects via config.
  *
- * @param  string  $dataset  Datset:           the name of the dataset. Just use "global" if you don't need horizontal partitioning.
- * @param  int     $part     Partition:        the vertical partition number (1, 2, 3, etc.). Use "0" if you don't need vertical partitioning.
- * @param  string  $dc       Datacenter:       where the database server is located. Airport codes are convenient. Use whatever.
- * @param  int     $read     Read group:       tries all servers in lowest number group before trying higher number group. Typical: 1 for slaves, 2 for master. This will cause reads to go to slaves unless al$
- * @param  bool    $write    Write flag:       is this server writable? Works the same as $read. Typical: 1 for master, 0 for slaves.
- * @param  string  $host     Internet address: host:port of server on internet.
+ * @param  string  $dataset  Dataset:          The name of the dataset. Just use "global" if you don't need horizontal partitioning.
+ * @param  int     $part     Partition:        The vertical partition number (1, 2, 3, etc.). Use "0" if you don't need vertical partitioning.
+ * @param  string  $dc       Datacenter:       Where the database server is located. Airport codes are convenient. Use whatever.
+ * @param  int     $read     Read group:       Tries all servers in lowest number group before trying higher number group. Typical: 1 for slaves, 2 for master. This will cause reads to go to slaves.
+ * @param  bool    $write    Write flag:       Is this server writable? Works the same as $read. Typical: 1 for master, 0 for slaves.
+ * @param  string  $host     Internet address: host:port of server on Internet.
  * @param  string  $lhost    Local address:    host:port of server for use when in same datacenter. Leave empty if no local address exists.
  * @param  string  $name     Database name.
  * @param  string  $user     Database user.
  * @param  string  $password Database password.
+ * @param  int     $timeout  Timeout.
  */
 function ldb_add_db_server( $dataset, $part, $dc, $read, $write, $host, $lhost, $name, $user, $password, $timeout = 0.2 ) {
 
 	// dc is not used in LudicrousDB. This produces the desired effect of
 	// trying to connect to local servers before remote servers. Also
 	// increases time allowed for TCP responsiveness check.
-	if ( ! empty( $dc ) && defined( DATACENTER ) && ( DATACENTER !== $dc ) ) {
+	if ( ! empty( $dc ) && ( defined( 'DATACENTER' ) && ( DATACENTER !== $dc ) ) ) {
 		$read   += 10000;
 		$write  += 10000;
 		$timeout = 0.7;
 	}
 
+	// Maybe add part to dataset
 	if ( ! empty( $part ) ) {
 		$dataset = "{$dataset}_{$part}";
 	}
 
+	// Put variables into array
 	$database = compact( 'dataset', 'read', 'write', 'host', 'name', 'user', 'password', 'timeout' );
 
+	// Add database array to main object
 	$GLOBALS['wpdb']->add_database( $database );
 
-	if ( defined( 'DATACENTER' ) && ( $dc === DATACENTER ) ) {
+	// Current datacenter
+	if ( defined( 'DATACENTER' ) && ( DATACENTER === $dc ) ) {
 
 		// lhost is not used in LudicrousDB. This configures LudicrousDB with an
 		// additional server to represent the local hostname so it tries to
