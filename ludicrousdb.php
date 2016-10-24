@@ -15,25 +15,22 @@
 // Exit if accessed directly
 defined( 'ABSPATH' ) || exit;
 
-// Required files
-require_once dirname( __FILE__ ) . '/ludicrousdb/includes/functions.php';
-require_once dirname( __FILE__ ) . '/ludicrousdb/includes/class-ludicrousdb.php';
-
 // Bail if database object is already set
 if ( isset( $GLOBALS['wpdb'] ) ) {
 	return;
 }
 
+// Required files
+require_once dirname( __FILE__ ) . '/ludicrousdb/includes/functions.php';
+require_once dirname( __FILE__ ) . '/ludicrousdb/includes/class-ludicrousdb.php';
+
 // Set default constants
 ldb_default_constants();
 
-// No LudicrousDB config file found or set
+// Create database object
+$wpdb = new LudicrousDB();
+
+// Include LudicrousDB config file if found or set
 if ( defined( 'DB_CONFIG_FILE' ) && file_exists( DB_CONFIG_FILE ) ) {
-	$wpdb = new LudicrousDB();
-
 	require_once DB_CONFIG_FILE;
-
-// Fallback to WordPress's built-in database connection
-} else {
-	$GLOBALS['wpdb'] = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
 }
