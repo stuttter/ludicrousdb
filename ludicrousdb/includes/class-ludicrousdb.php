@@ -14,7 +14,7 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * After any SQL_CALC_FOUND_ROWS query, the query "SELECT FOUND_ROWS()"
-	 * is sent and the mysql result resource stored here. The next query
+	 * is sent and the MySQL result resource stored here. The next query
 	 * for FOUND_ROWS() will retrieve this. We do this to prevent any
 	 * intervening queries from making FOUND_ROWS() inaccessible. You may
 	 * prevent this by adding "NO_SELECT_FOUND_ROWS" in a comment
@@ -31,14 +31,14 @@ class LudicrousDB extends wpdb {
 	public $save_queries = false;
 
 	/**
-	 * The current mysql link resource
+	 * The current MySQL link resource
 	 *
 	 * @var resource
 	 */
 	public $dbh;
 
 	/**
-	 * Associative array (dbhname => dbh) for established mysql connections
+	 * Associative array (dbhname => dbh) for established MySQL connections
 	 *
 	 * @var array
 	 */
@@ -319,7 +319,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @param string query
 	 *
-	 * @return resource mysql database connection
+	 * @return resource MySQL database connection
 	 */
 	public function db_connect( $query = '' ) {
 
@@ -805,7 +805,7 @@ class LudicrousDB extends wpdb {
 	 * modes are compatible
 	 *
 	 * @param array $modes Optional. A list of SQL modes to set.
-	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 */
 	public function set_sql_mode( $modes = array(), $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
@@ -872,7 +872,7 @@ class LudicrousDB extends wpdb {
 	 * connection. On failure, the execution will bail and display an DB error
 	 *
 	 * @param string $db MySQL database name
-	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 */
 	public function select( $db, $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
@@ -1281,7 +1281,7 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Closes the current database connection
 	 *
-	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 *
 	 * @return bool True if the connection was successfully closed, false if it wasn't,
 	 *              or the connection doesn't exist.
@@ -1313,7 +1313,7 @@ class LudicrousDB extends wpdb {
 	 * @global $wp_version
 	 * @global $required_mysql_version
 	 *
-	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 *
 	 * @return WP_Error
 	 */
@@ -1328,12 +1328,12 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * This function is called when WordPress is generating the table schema to determine wether or not the current database
+	 * This function is called when WordPress is generating the table schema to determine whether or not the current database
 	 * supports or needs the collation statements
 	 *
 	 * The additional argument allows the caller to check a specific database
 	 *
-	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 *
 	 * @return bool
 	 */
@@ -1348,7 +1348,7 @@ class LudicrousDB extends wpdb {
 	 * The additional argument allows the caller to check a specific database
 	 *
 	 * @param string $db_cap the feature
-	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 *
 	 * @return bool
 	 */
@@ -1396,7 +1396,7 @@ class LudicrousDB extends wpdb {
 	/**
 	 * The database version number
 	 *
-	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 *
 	 * @return false|string false on failure, version number on success
 	 */
@@ -1419,7 +1419,7 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Get the db connection object
 	 *
-	 * @param false|string|resource $dbh_or_table the databaese (the current database, the database housing the specified table, or the database of the mysql resource)
+	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 */
 	private function get_db_object( $dbh_or_table = false ) {
 
@@ -1458,7 +1458,7 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Get the name of the function that called wpdb
+	 * Get the name of the function that called wpdb()
 	 *
 	 * @return string the name of the calling function
 	 */
@@ -1501,51 +1501,39 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Check the responsiveness of a tcp/ip daemon
+	 * Check the responsiveness of a TCP/IP daemon
 	 *
-	 * @return (bool) true when $host:$post responds within $float_timeout seconds, else (bool) false
+	 * @return bool true when $host:$post responds within $float_timeout seconds, else false
 	 */
 	public function check_tcp_responsiveness( $host, $port, $float_timeout ) {
 
-		// Using APC?
-		if ( function_exists( 'apc_store' ) ) {
-			$use_apc = true;
-			$apc_key = "{$host}{$port}";
-			$apc_ttl = 10;
-		} else {
-			$use_apc = false;
-		}
+		// Get the cache key
+		$cache_key = $this->tcp_get_cache_key( $host, $port );
 
-		// Using API
-		if ( true === $use_apc ) {
-			$cached_value = apc_fetch( $apc_key );
-			switch ( $cached_value ) {
-				case 'up':
-					$this->tcp_responsive = 'true';
+		// Persistent cached value exists
+		$cached_value = $this->tcp_cache_get( $cache_key );
 
-					return true;
-				case 'down':
-					$this->tcp_responsive = 'false';
-
-					return false;
-			}
+		// Confirmed up or down response
+		if ( 'up' === $cached_value ) {
+			$this->tcp_responsive = true;
+			return true;
+		} elseif ( 'down' === $cached_value ) {
+			$this->tcp_responsive = false;
+			return false;
 		}
 
 		// Defaults
 		$errno  = 0;
 		$errstr = '';
 
-		if ( WP_DEBUG ) {
-			$socket = fsockopen( $host, $port, $errno, $errstr, $float_timeout );
-		} else {
-			$socket = @fsockopen( $host, $port, $errno, $errstr, $float_timeout );
-		}
+		// Try to get a new socket
+		$socket = ( WP_DEBUG )
+			?  fsockopen( $host, $port, $errno, $errstr, $float_timeout )
+			: @fsockopen( $host, $port, $errno, $errstr, $float_timeout );
 
 		// No socket
-		if ( $socket === false ) {
-			if ( true === $use_apc ) {
-				apc_store( $apc_key, 'down', $apc_ttl );
-			}
+		if ( false === $socket ) {
+			$this->tcp_cache_set( $cache_key, 'down' );
 
 			return "[ > {$float_timeout} ] ({$errno}) '{$errstr}'";
 		}
@@ -1554,9 +1542,7 @@ class LudicrousDB extends wpdb {
 		fclose( $socket );
 
 		// Using API
-		if ( true === $use_apc ) {
-			apc_store( $apc_key, 'up', $apc_ttl );
-		}
+		$this->tcp_cache_set( $cache_key, 'up' );
 
 		return true;
 	}
@@ -1586,7 +1572,7 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Retrieves a table's character set.
+	 * Retrieves a tables character set.
 	 *
 	 * NOTE: This must be called after LudicrousDB::db_connect, so that wpdb::dbh is set correctly
 	 *
@@ -1731,5 +1717,59 @@ class LudicrousDB extends wpdb {
 		}
 
 		return $row[ 0 ];
+	}
+
+	/** TCP Cache *************************************************************/
+
+	/**
+	 * Get the cache key used for TCP responses
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $host
+	 * @param string $port
+	 *
+	 * @return string
+	 */
+	protected function tcp_get_cache_key( $host, $port ) {
+		return "{$host}:{$port}";
+	}
+
+	/**
+	 * Get the number of seconds TCP response is good for
+	 *
+	 * @since 3.0.0
+	 *
+	 * @return int
+	 */
+	protected function tcp_get_cache_expiration() {
+		return 10;
+	}
+
+	/**
+	 * Get cached up/down value of previous TCP response
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $key Results of tcp_get_cache_key()
+	 *
+	 * @return mixed Results of wp_cache_get()
+	 */
+	protected function tcp_cache_get( $key ) {
+		return wp_cache_get( $key, 'ludicrousdb' );
+	}
+
+	/**
+	 * Set cached up/down value of current TCP response
+	 *
+	 * @since 3.0.0
+	 *
+	 * @param string $key   Results of tcp_get_cache_key()
+	 * @param string $value "up" or "down" based on TCP response
+	 *
+	 * @return bool Results of wp_cache_set()
+	 */
+	protected function tcp_cache_set( $key, $value ) {
+		return wp_cache_set( $key, $value, 'ludicrousdb', $this->tcp_get_cache_expiration() );
 	}
 }
