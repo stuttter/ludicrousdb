@@ -1116,9 +1116,10 @@ class LudicrousDB extends wpdb {
 			 * the DB query and stopping it from running then returning this value instead.
 			 *
 			 * @param string $pre The filtered return value. Default is null.
+			 * @param string $query Database query.
 			 * @param LudicrousDB &$this Current instance of LudicrousDB, passed by reference.
 			 */
-			$return_val = apply_filters_ref_array( 'pre_query_execution', array( null, &$this ) );
+			$return_val = apply_filters_ref_array( 'pre_query_execution', array( null, $query, &$this ) );
 			if ( null !== $return_val ) {
 				return $return_val;
 			}
