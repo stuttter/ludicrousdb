@@ -1108,6 +1108,20 @@ class LudicrousDB extends wpdb {
 			 * @param string $query Database query.
 			 */
 			$query = apply_filters( 'query', $query );
+
+			/**
+			 * Filter the result value before the query is run.
+			 *
+			 * Passing a non-null value to the filter will effectively short-circuit
+			 * the DB query and stopping it from running then returning this value instead.
+			 *
+			 * @param string $pre The filtered return value. Default is null.
+			 * @param LudicrousDB &$this Current instance of LudicrousDB, passed by reference.
+			 */
+			$return_val = apply_filters_ref_array( 'pre_query_execution', array( null, &$this ) );
+			if ( null !== $return_val ) {
+				return $return_val;
+			}
 		}
 
 		// initialise return
@@ -1125,8 +1139,8 @@ class LudicrousDB extends wpdb {
 			$this->flush();
 			if ( $stripped_query !== $query ) {
 				$this->insert_id = 0;
-
-				return false;
+				$return_val = false;
+				return $return_val;
 			}
 		}
 
@@ -1202,8 +1216,8 @@ class LudicrousDB extends wpdb {
 
 		if ( ! empty( $this->last_error ) ) {
 			$this->print_error( $this->last_error );
-
-			return false;
+			$return_val = false;
+			return $return_val;
 		}
 
 		if ( preg_match( '/^\s*(create|alter|truncate|drop)\s/i', $query ) ) {
