@@ -1,5 +1,11 @@
 <?php
 
+/**
+ * LudicrousDB Functions
+ *
+ * @package Plugins/LudicrousDB/Functions
+ */
+
 // Exit if accessed directly
 defined( 'ABSPATH' ) || exit;
 
