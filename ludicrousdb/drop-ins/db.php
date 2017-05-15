@@ -2,14 +2,14 @@
 
 /**
  * Plugin Name: LudicrousDB
- * Plugin URI:  https://github.com/stuttter/ludicrousdb
+ * Plugin URI:  https://wordpress.org/plugins/ludicrousdb/
  * Author:      John James Jacoby
- * Author URI:  https://github.com/stuttter/
- * License:     GPLv2 or later
+ * Author URI:  https://jjj.blog
+ * License:     GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Description: An advanced database class that supports replication, failover, load balancing, and partitioning.
- * Version:     3.0.0
  * Text Domain: ludicrousdb
+ * Version:     3.0.0
+ * Description: An advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
  */
 
 // Exit if accessed directly
