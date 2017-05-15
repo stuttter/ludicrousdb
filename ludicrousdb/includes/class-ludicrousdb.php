@@ -1,8 +1,19 @@
 <?php
 
+/**
+ * LudicrousDB Class
+ *
+ * @package Plugins/LudicrousDB/Class
+ */
+
 // Exit if accessed directly
 defined( 'ABSPATH' ) || exit;
 
+/**
+ * The main LudicrousDB class, which extends wpdb
+ *
+ * @since 1.0.0
+ */
 class LudicrousDB extends wpdb {
 
 	/**
@@ -323,6 +334,7 @@ class LudicrousDB extends wpdb {
 	 */
 	public function db_connect( $query = '' ) {
 
+		// Bail if empty query
 		if ( empty( $query ) ) {
 			return false;
 		}
