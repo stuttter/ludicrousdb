@@ -1289,6 +1289,17 @@ class LudicrousDB extends wpdb {
 			$return_val     = $num_rows;
 		}
 
+		if ( function_exists( 'do_action_ref_array' ) ) {
+			/**
+			 * Runs after query.
+			 *
+			 * @param String        $query Database query.
+			 * @param LudicrousDB   &$this Current instance of LudicrousDB, passed by reference.
+			 */
+			do_action_ref_array( 'after_query', array( $query, &$this ) );
+		}
+
+
 		return $return_val;
 	}
 
