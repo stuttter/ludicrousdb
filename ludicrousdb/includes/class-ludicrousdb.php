@@ -1112,8 +1112,7 @@ class LudicrousDB extends wpdb {
 		$return_val = 0;
 		$this->flush();
 
-		// Some queries are made before the plugins have been loaded, and thus
-		// cannot be filtered with this method
+		// Some queries are made before plugins are loaded
 		if ( function_exists( 'apply_filters' ) ) {
 
 			/**
@@ -1125,6 +1124,10 @@ class LudicrousDB extends wpdb {
 			 * @param string $query Database query.
 			 */
 			$query = apply_filters( 'query', $query );
+		}
+
+		// Some queries are made before plugins are loaded
+		if ( function_exists( 'apply_filters_ref_array' ) ) {
 
 			/**
 			 * Filter the return value before the query is run.
@@ -1137,6 +1140,8 @@ class LudicrousDB extends wpdb {
 			 *
 			 * You probably will never need to use this filter, but if you do, there's
 			 * no other way to do what you're trying to do, so here you go!
+			 *
+			 * @since 4.0.0
 			 *
 			 * @param string      null   The filtered return value. Default is null.
 			 * @param string      $query Database query.
@@ -1289,16 +1294,19 @@ class LudicrousDB extends wpdb {
 			$return_val     = $num_rows;
 		}
 
+		// Some queries are made before plugins are loaded
 		if ( function_exists( 'do_action_ref_array' ) ) {
-			/**
-			 * Runs after query.
-			 *
-			 * @param String        $query Database query.
-			 * @param LudicrousDB   &$this Current instance of LudicrousDB, passed by reference.
-			 */
-			do_action_ref_array( 'after_query', array( $query, &$this ) );
-		}
 
+			/**
+			 * Runs after a query is finished.
+			 *
+			 * @since 4.0.0
+			 *
+			 * @param string       $query  Database query.
+			 * @param LudicrousDB  &$this  Current instance of LudicrousDB, passed by reference.
+			 */
+			do_action_ref_array( 'queried', array( $query, &$this ) );
+		}
 
 		return $return_val;
 	}
