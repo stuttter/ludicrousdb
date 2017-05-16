@@ -1108,9 +1108,14 @@ class LudicrousDB extends wpdb {
 	 */
 	public function query( $query ) {
 
+		// initialise return
+		$return_val = 0;
+		$this->flush();
+
 		// Some queries are made before the plugins have been loaded, and thus
 		// cannot be filtered with this method
 		if ( function_exists( 'apply_filters' ) ) {
+
 			/**
 			 * Filter the database query.
 			 *
@@ -1122,24 +1127,31 @@ class LudicrousDB extends wpdb {
 			$query = apply_filters( 'query', $query );
 
 			/**
-			 * Filter the result value before the query is run.
+			 * Filter the return value before the query is run.
 			 *
 			 * Passing a non-null value to the filter will effectively short-circuit
-			 * the DB query and stopping it from running then returning this value instead.
+			 * the DB query, stopping it from running, then returning this value instead.
 			 *
-			 * @param string $pre The filtered return value. Default is null.
-			 * @param string $query Database query.
+			 * This uses apply_filters_ref_array() to allow $this to be manipulated, so
+			 * values can be set just-in-time to match your particular use-case.
+			 *
+			 * You probably will never need to use this filter, but if you do, there's
+			 * no other way to do what you're trying to do, so here you go!
+			 *
+			 * @param string      null   The filtered return value. Default is null.
+			 * @param string      $query Database query.
 			 * @param LudicrousDB &$this Current instance of LudicrousDB, passed by reference.
 			 */
-			$return_val = apply_filters_ref_array( 'pre_query_execution', array( null, $query, &$this ) );
+			$return_val = apply_filters_ref_array( 'pre_query', array( null, $query, &$this ) );
 			if ( null !== $return_val ) {
 				return $return_val;
 			}
 		}
 
-		// initialise return
-		$return_val = 0;
-		$this->flush();
+		// Bail if query is empty (via application error or 'query' filter)
+		if ( empty( $query ) ) {
+			return $return_val;
+		}
 
 		// Log how the function was called
 		$this->func_call = "\$db->query(\"{$query}\")";
