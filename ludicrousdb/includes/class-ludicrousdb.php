@@ -172,6 +172,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Gets ready to make database connections
 	 *
+	 * @since 1.0.0
+	 *
 	 * @param array db class vars
 	 */
 	public function __construct( $args = null ) {
@@ -212,12 +214,18 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Sets $this->charset and $this->collate
+	 *
+	 * @since 1.0.0
+	 *
+	 * @global array $wp_global
 	 */
 	public function init_charset() {
 		global $wp_version;
 
-		$charset = '';
-		$collate = '';
+		// Defaults
+		$charset = $collate = '';
+
+		// Multisite
 		if ( function_exists( 'is_multisite' ) && is_multisite() ) {
 			if ( version_compare( $wp_version, '4.2', '<' ) ) {
 				$charset = 'utf8';
@@ -228,27 +236,33 @@ class LudicrousDB extends wpdb {
 			}
 		}
 
+		// Use constant if defined
 		if ( defined( 'DB_COLLATE' ) ) {
 			$collate = DB_COLLATE;
 		}
 
+		// Use constant if defined
 		if ( defined( 'DB_CHARSET' ) ) {
 			$charset = DB_CHARSET;
 		}
 
 		// determine_charset is only in WordPress 4.6
 		if ( method_exists( $this, 'determine_charset' ) ) {
-			$charset_collate = $this->determine_charset( $charset, $collate );
-			$charset         = $charset_collate['charset'];
-			$collate         = $charset_collate['collate'];
+			$determined = $this->determine_charset( $charset, $collate );
+			$charset    = $determined['charset'];
+			$collate    = $determined['collate'];
+			unset( $determined );
 		}
 
+		// Set chaset & collation
 		$this->charset = $charset;
 		$this->collate = $collate;
 	}
 
 	/**
 	 * Add the connection parameters for a database
+	 *
+	 * @since 1.0.0
 	 */
 	public function add_database( array $db = array() ) {
 
@@ -277,6 +291,8 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Specify the dataset where a table is found
+	 *
+	 * @since 1.0.0
 	 */
 	public function add_table( $dataset, $table ) {
 		$this->ludicrous_tables[ $table ] = $dataset;
@@ -294,6 +310,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Determine the likelihood that this query could alter anything
 	 *
+	 * @since 1.0.0
+	 *
 	 * @param string query
 	 *
 	 * @return bool
@@ -307,6 +325,8 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Set a flag to prevent reading from slaves which might be lagging after a write
+	 *
+	 * @since 1.0.0
 	 */
 	public function send_reads_to_masters() {
 		$this->srtm = true;
@@ -315,6 +335,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Callbacks are executed in the order in which they are registered until one
 	 * of them returns something other than null
+	 *
+	 * @since 1.0.0
 	 */
 	public function run_callbacks( $group, $args = null ) {
 		if ( ! isset( $this->ludicrous_callbacks[ $group ] ) || ! is_array( $this->ludicrous_callbacks[ $group ] ) ) {
@@ -339,6 +361,8 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Figure out which db server should handle the query, and connect to it
+	 *
+	 * @since 1.0.0
 	 *
 	 * @param string query
 	 *
@@ -753,6 +777,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Connect selected database
 	 *
+	 * @since 1.0.0
+	 *
 	 * @param string $dbhname
 	 * @param string $host Internet address: host:port of server on internet.
 	 * @param string $user Database user.
@@ -828,6 +854,8 @@ class LudicrousDB extends wpdb {
 	 * If no modes are passed, it will ensure the current MySQL server
 	 * modes are compatible
 	 *
+	 * @since 1.0.0
+	 *
 	 * @param array $modes Optional. A list of SQL modes to set.
 	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 */
@@ -895,6 +923,8 @@ class LudicrousDB extends wpdb {
 	 * The database name will be changed based on the current database
 	 * connection. On failure, the execution will bail and display an DB error
 	 *
+	 * @since 1.0.0
+	 *
 	 * @param string $db MySQL database name
 	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 */
@@ -917,9 +947,13 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Load the column metadata from the last query.
 	 *
+	 * @since 1.0.0
+	 *
 	 * @access protected
 	 */
 	protected function load_col_info() {
+
+		// Bail if not enough info
 		if ( ! empty( $this->col_info ) || ( false === $this->result ) ) {
 			return;
 		}
@@ -948,6 +982,8 @@ class LudicrousDB extends wpdb {
 	 * This is also the reason why we don't allow certain charsets.
 	 *
 	 * See set_charset().
+	 *
+	 * @since 1.0.0
 	 */
 	public function _real_escape( $string ) {
 		return addslashes( $string );
@@ -955,6 +991,8 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Sets the connection's character set
+	 *
+	 * @since 1.0.0
 	 *
 	 * @param resource $dbh The resource given by mysql_connect
 	 * @param string $charset The character set (optional)
@@ -993,6 +1031,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Disconnect and remove connection from open connections list
 	 *
+	 * @since 1.0.0
+	 *
 	 * @param string $dbhname
 	 */
 	public function disconnect( $dbhname ) {
@@ -1011,6 +1051,8 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Kill cached query results
+	 *
+	 * @since 1.0.0
 	 */
 	public function flush() {
 		$this->last_error = '';
@@ -1027,6 +1069,8 @@ class LudicrousDB extends wpdb {
 	 *
 	 * If $allow_bail is false, the lack of database connection will need
 	 * to be handled manually
+	 *
+	 * @since 1.0.0
 	 *
 	 * @param bool $allow_bail Optional. Allows the function to bail. Default true.
 	 *
@@ -1110,7 +1154,9 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Basic query. See docs for more details
+	 * Basic query. See documentation for more details.
+	 *
+	 * @since 1.0.0
 	 *
 	 * @param string $query
 	 *
@@ -1174,12 +1220,15 @@ class LudicrousDB extends wpdb {
 		// If we're writing to the database, make sure the query will write safely.
 		if ( $this->check_current_query && ! $this->check_ascii( $query ) ) {
 			$stripped_query = $this->strip_invalid_text_from_query( $query );
+
 			// strip_invalid_text_from_query() can perform queries, so we need
 			// to flush again, just to make sure everything is clear.
 			$this->flush();
+
 			if ( $stripped_query !== $query ) {
 				$this->insert_id = 0;
-				$return_val = false;
+				$return_val      = false;
+
 				return $return_val;
 			}
 		}
@@ -1324,6 +1373,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Internal function to perform the mysql_query() call
 	 *
+	 * @since 1.0.0
+	 *
 	 * @access protected
 	 * @see wpdb::query()
 	 *
@@ -1348,6 +1399,8 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Closes the current database connection
+	 *
+	 * @since 1.0.0
 	 *
 	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 *
@@ -1378,6 +1431,8 @@ class LudicrousDB extends wpdb {
 	 * Whether or not MySQL database is at least the required minimum version.
 	 * The additional argument allows the caller to check a specific database
 	 *
+	 * @since 1.0.0
+	 *
 	 * @global $wp_version
 	 * @global $required_mysql_version
 	 *
@@ -1401,6 +1456,8 @@ class LudicrousDB extends wpdb {
 	 *
 	 * The additional argument allows the caller to check a specific database
 	 *
+	 * @since 1.0.0
+	 *
 	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 *
 	 * @return bool
@@ -1414,6 +1471,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Generic function to determine if a database supports a particular feature
 	 * The additional argument allows the caller to check a specific database
+	 *
+	 * @since 1.0.0
 	 *
 	 * @param string $db_cap the feature
 	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
@@ -1466,6 +1525,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * The database version number
 	 *
+	 * @since 1.0.0
+	 *
 	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 *
 	 * @return false|string false on failure, version number on success
@@ -1477,17 +1538,17 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		if ( true === $this->use_mysqli ) {
-			$server_info = mysqli_get_server_info( $dbh );
-		} else {
-			$server_info = mysql_get_server_info( $dbh );
-		}
+		$server_info = ( true === $this->use_mysqli )
+			? mysqli_get_server_info( $dbh )
+			: mysql_get_server_info( $dbh );
 
 		return preg_replace( '/[^0-9.].*/', '', $server_info );
 	}
 
 	/**
 	 * Get the db connection object
+	 *
+	 * @since 1.0.0
 	 *
 	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
 	 */
@@ -1515,6 +1576,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * @param $dbh resource|mysqli
 	 *
+	 * @since 1.0.0
+	 *
 	 * @return bool
 	 */
 	private function dbh_type_check( $dbh ) {
@@ -1530,14 +1593,18 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Get the name of the function that called wpdb()
 	 *
+	 * @since 1.0.0
+	 *
 	 * @return string the name of the calling function
 	 */
 	public function get_caller() {
+
+		// Bail with a WordPress backtrace
 		if ( function_exists( 'wp_debug_backtrace_summary' ) ) {
 			return wp_debug_backtrace_summary( __CLASS__ );
 		}
 
-		// requires PHP 4.3+
+		// Bail as requires at least PHP 4.3+
 		if ( ! is_callable( 'debug_backtrace' ) ) {
 			return '';
 		}
@@ -1572,6 +1639,8 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Check the responsiveness of a TCP/IP daemon
+	 *
+	 * @since 1.0.0
 	 *
 	 * @return bool true when $host:$post responds within $float_timeout seconds, else false
 	 */
@@ -1784,6 +1853,8 @@ class LudicrousDB extends wpdb {
 	 *
 	 * NOTE: This must be called after LudicrousDB::db_connect, so that wpdb::dbh is set correctly
 	 *
+	 * @since 1.0.0
+	 *
 	 * @param string $string String to convert
 	 * @param string $charset Character set to test against (uses MySQL character set names)
 	 *
@@ -1793,16 +1864,17 @@ class LudicrousDB extends wpdb {
 		$query  = $this->prepare( "SELECT CONVERT( %s USING {$charset} )", $string );
 		$result = $this->_do_query( $query, $this->dbh );
 
+		// Bail with error if no result
 		if ( empty( $result ) ) {
 			return new WP_Error( 'wpdb_convert_text_failure' );
 		}
 
-		if ( true === $this->use_mysqli ) {
-			$row = mysqli_fetch_row( $result );
-		} else {
-			$row = mysql_fetch_row( $result );
-		}
+		// Fetch row
+		$row = ( true === $this->use_mysqli )
+			? mysqli_fetch_row( $result )
+			: mysql_fetch_row( $result );
 
+		// Bail with error if no rows
 		if ( ! is_array( $row ) || count( $row ) < 1 ) {
 			return new WP_Error( 'wpdb_convert_text_failure' );
 		}
