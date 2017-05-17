@@ -15,9 +15,12 @@
 // Exit if accessed directly
 defined( 'ABSPATH' ) || exit;
 
+$wp_plugin_dir = ( defined('WP_PLUGIN_DIR') ) ? WP_PLUGIN_DIR : WP_CONTENT_DIR . '/plugins';
+$wpmu_plugin_dir = ( defined('WP_PLUGIN_DIR') ) ? WPMU_PLUGIN_DIR : WP_CONTENT_DIR . '/mu-plugins';
+
 // Require the main plugin file
-if ( file_exists( WP_PLUGIN_DIR . '/ludicrousdb/ludicrousdb.php' ) ) {
-	require_once WP_PLUGIN_DIR . '/ludicrousdb/ludicrousdb.php';
-} elseif ( file_exists( WPMU_PLUGIN_DIR . '/ludicrousdb/ludicrousdb.php' ) ) {
-	require_once WPMU_PLUGIN_DIR . '/ludicrousdb/ludicrousdb.php';
+if ( file_exists(  $wp_plugin_dir . '/ludicrousdb/ludicrousdb.php' ) ) {
+	require_once $wp_plugin_dir . '/ludicrousdb/ludicrousdb.php';
+} elseif ( file_exists( $wpmu_plugin_dir . '/ludicrousdb/ludicrousdb.php' ) ) {
+	require_once $wpmu_plugin_dir . '/ludicrousdb/ludicrousdb.php';
 }
