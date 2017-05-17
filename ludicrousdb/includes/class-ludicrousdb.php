@@ -216,23 +216,35 @@ class LudicrousDB extends wpdb {
 	public function init_charset() {
 		global $wp_version;
 
+		$charset = '';
+		$collate = '';
 		if ( function_exists( 'is_multisite' ) && is_multisite() ) {
 			if ( version_compare( $wp_version, '4.2', '<' ) ) {
-				$this->charset = 'utf8';
-				$this->collate = 'utf8_general_ci';
+				$charset = 'utf8';
+				$collate = 'utf8_general_ci';
 			} else {
-				$this->charset = 'utf8mb4';
-				$this->collate = 'utf8mb4_unicode_ci';
+				$charset = 'utf8mb4';
+				$collate = 'utf8mb4_unicode_ci';
 			}
 		}
 
 		if ( defined( 'DB_COLLATE' ) ) {
-			$this->collate = DB_COLLATE;
+			$collate = DB_COLLATE;
 		}
 
 		if ( defined( 'DB_CHARSET' ) ) {
-			$this->charset = DB_CHARSET;
+			$charset = DB_CHARSET;
 		}
+
+		// determine_charset is only in WordPress 4.6
+		if ( method_exists( $this, 'determine_charset' ) ) {
+			$charset_collate = $this->determine_charset( $charset, $collate );
+			$charset         = $charset_collate['charset'];
+			$collate         = $charset_collate['collate'];
+		}
+
+		$this->charset = $charset;
+		$this->collate = $collate;
 	}
 
 	/**
@@ -952,25 +964,23 @@ class LudicrousDB extends wpdb {
 		if ( ! isset( $charset ) ) {
 			$charset = $this->charset;
 		}
-
 		if ( ! isset( $collate ) ) {
 			$collate = $this->collate;
 		}
-
 		if ( empty( $charset ) || empty( $collate ) ) {
 			wp_die( "{$charset}  {$collate}" );
 		}
-
 		if ( ! in_array( strtolower( $charset ), array( 'utf8', 'utf8mb4', 'latin1' ) ) ) {
 			wp_die( "{$charset} charset isn't supported in LudicrousDB for security reasons" );
 		}
-
 		if ( $this->has_cap( 'collation', $dbh ) && ! empty( $charset ) ) {
+			$set_charset_succeeded = true;
 			if ( ( true === $this->use_mysqli ) && function_exists( 'mysqli_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
-				mysqli_set_charset( $dbh, $charset );
+				$set_charset_succeeded = mysqli_set_charset( $dbh, $charset );
 			} elseif ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
-				mysql_set_charset( $charset, $dbh );
-			} else {
+				$set_charset_succeeded = mysql_set_charset( $charset, $dbh );
+			}
+			if ( $set_charset_succeeded ) {
 				$query = $this->prepare( 'SET NAMES %s', $charset );
 				if ( ! empty( $collate ) ) {
 					$query .= $this->prepare( ' COLLATE %s', $collate );
@@ -1446,6 +1456,8 @@ class LudicrousDB extends wpdb {
 						return version_compare( $client_version, '5.5.3', '>=' );
 					}
 				}
+			case 'utf8mb4_520' : // @since 4.6.0
+				return version_compare( $version, '5.6', '>=' );
 		}
 
 		return false;
