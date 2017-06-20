@@ -16,7 +16,7 @@
 defined( 'ABSPATH' ) || exit;
 
 $wp_plugin_dir = ( defined('WP_PLUGIN_DIR') ) ? WP_PLUGIN_DIR : WP_CONTENT_DIR . '/plugins';
-$wpmu_plugin_dir = ( defined('WP_PLUGIN_DIR') ) ? WPMU_PLUGIN_DIR : WP_CONTENT_DIR . '/mu-plugins';
+$wpmu_plugin_dir = ( defined('WPMU_PLUGIN_DIR') ) ? WPMU_PLUGIN_DIR : WP_CONTENT_DIR . '/mu-plugins';
 
 // Require the main plugin file
 if ( file_exists(  $wp_plugin_dir . '/ludicrousdb/ludicrousdb.php' ) ) {
