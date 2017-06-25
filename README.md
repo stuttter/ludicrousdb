@@ -11,7 +11,7 @@ Copy the main `ludicrousdb` plugin folder & it's contents to either:
 * `wp-content/plugins/ludicrousdb/`
 * `wp-content/mu-plugins/ludicrousdb/`
 
-It does not matter which one; LudicrousDB will figure it out.
+It does not matter which one; LudicrousDB will figure it out. The folder name should be exactly `ludicrousdb`. Be careful when you do "Download ZIP" from github and unzip.
 
 ### Drop-ins
 
