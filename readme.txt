@@ -41,14 +41,7 @@ HyperDB's original contributors: matt, andy, ryan, mdawaffe, vnsavage, automatti
 
 == Installation ==
 
-Nothing goes in the plugins directory.
-
-1. Enter a configuration in `db-config.php`.
-2. Deploy `db-config.php` in the directory that holds `wp-config.php`. This may be the WordPress root or one level above. It may also be anywhere else the web server can see it; in this case, define `DB_CONFIG_FILE` in `wp-config.php`.
-3. Deploy `db.php` to the `/wp-content/` directory. Simply placing this file activates it. To deactivate it, move it from that location or move the config file.
-4. Optional - deploy `db-error.php` to the `/wp-content/` directory. This file is used when database connections critically fail.
-
-Any value of `WP_USE_MULTIPLE_DB` will be ignored by LudicrousDB.
+See https://github.com/stuttter/ludicrousdb/blob/master/README.md#installation
 
 == Frequently Asked Questions ==
 
