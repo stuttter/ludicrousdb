@@ -1,6 +1,6 @@
 # LudicrousDB
 
-LudicrousDB is an advanced database class that supports replication, failover, load balancing, and partitioning, based on Automattic's HyperDB drop-in.
+LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning, based on Automattic's HyperDB drop-in.
 
 ## Installation
 
@@ -11,7 +11,7 @@ Copy the main `ludicrousdb` plugin folder & it's contents to either:
 * `wp-content/plugins/ludicrousdb/`
 * `wp-content/mu-plugins/ludicrousdb/`
 
-It does not matter which one; LudicrousDB will figure it out.
+It does not matter which one; LudicrousDB will figure it out. The folder name should be exactly `ludicrousdb`. Be careful when you do "Download ZIP" from github and unzip.
 
 ### Drop-ins
 
