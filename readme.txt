@@ -1,9 +1,9 @@
 === LudicrousDB ===
 Contributors: johnjamesjacoby, spacedmonkey
 Tags: mysql, scaling, performance, availability, replication
-Requires at least: 4.6
-Tested up to: 4.7
-Stable tag: 4.0.0
+Requires at least: 4.8
+Tested up to: 4.9
+Stable tag: 4.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=9Q4F4EL5YJ62J
@@ -78,6 +78,9 @@ One way LudicrousDB differs from WPDB is that LudicrousDB does not attempt to co
 Since LudicrousDB attempts a connection only when a query is made, your WordPress installation will not kill the site with a database error, but will let the code decide what to do next on an unsuccessful query. If you want to do something different, like setting a custom error page or kill the site, you need to define the 'db_connection_error' callback in your db-config.php.
 
 == Changelog ==
+
+= 4.1.0 =
+* Fix WordPress 4.8.3 SQLi vulnerability
 
 = 4.0.0 =
 * Support for custom mu / plugin paths

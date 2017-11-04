@@ -986,7 +986,16 @@ class LudicrousDB extends wpdb {
 	 * @since 1.0.0
 	 */
 	public function _real_escape( $string ) {
-		return addslashes( $string );
+
+		// Slash the query part
+		$escaped = addslashes( $string );
+
+		// Maybe use WordPress core placeholder method
+		if ( method_exists( $this, 'add_placeholder_escape' ) ) {
+			$escaped = $this->add_placeholder_escape( $escaped );
+		}
+
+		return $escaped;
 	}
 
 	/**
