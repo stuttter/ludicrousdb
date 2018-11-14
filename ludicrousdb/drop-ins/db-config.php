@@ -48,6 +48,13 @@ $wpdb->save_queries = false;
 $wpdb->persistent = false;
 
 /**
+ * allow_bail (bool)
+ * This determines whether to use mysql connect or mysql connect has failed and to bail loading the rest of WordPress
+ * Default: false
+ */
+$wpdb->allow_bail = false;
+
+/**
  * max_connections (int)
  * This is the number of mysql connections to keep open. Increase if you expect
  * to reuse a lot of connections to different servers. This is ignored if you

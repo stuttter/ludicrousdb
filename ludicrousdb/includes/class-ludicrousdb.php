@@ -91,6 +91,13 @@ class LudicrousDB extends wpdb {
 	public $persistent = false;
 
 	/**
+	 * Allow bail if connection fails
+	 *
+	 * @public bool
+	 */
+	public $allow_bail = false;
+
+	/**
 	 * The maximum number of db links to keep open. The least-recently used
 	 * link will be closed when the number of links exceeds this
 	 *
@@ -507,7 +514,7 @@ class LudicrousDB extends wpdb {
 			$this->last_used_server = $this->used_servers[ $dbhname ];
 			$this->last_connection  = compact( 'dbhname', 'name' );
 
-			if ( ! $this->check_connection( false, $this->dbhs[ $dbhname ] ) ) {
+			if ( ! $this->check_connection( $this->allow_bail, $this->dbhs[ $dbhname ], $query ) ) {
 				if ( isset( $conn['disconnect (ping failed)'] ) ) {
 					++ $conn['disconnect (ping failed)'];
 				} else {
@@ -1081,11 +1088,13 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param bool $allow_bail Optional. Allows the function to bail. Default true.
+	 * @param bool   $allow_bail Optional. Allows the function to bail. Default true.
+	 * @param bool   $dbh_or_table Optional.
+	 * @param string $query Optional. Query string passed db_connect
 	 *
-	 * @return bool|void True if the connection is up.
+     * @return bool|void True if the connection is up.
 	 */
-	public function check_connection( $allow_bail = true, $dbh_or_table = false ) {
+	public function check_connection( $allow_bail = true, $dbh_or_table = false, $query = '' ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
 
 		if ( $this->dbh_type_check( $dbh ) ) {
@@ -1120,7 +1129,7 @@ class LudicrousDB extends wpdb {
 				error_reporting( $error_reporting );
 			}
 
-			if ( $this->db_connect( false ) ) {
+			if ( $this->db_connect( $query ) ) {
 				if ( $error_reporting ) {
 					error_reporting( $error_reporting );
 				}
