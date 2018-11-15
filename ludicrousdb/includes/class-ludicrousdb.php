@@ -112,6 +112,14 @@ class LudicrousDB extends wpdb {
 	 */
 	public $recheck_timeout = 0.1;
 
+
+	/**
+	 * Keeps track of the dbhname usage and errors.
+	 * 
+	 * @var array
+	 */
+	public $dbhname_heartbeats = array();
+
 	/**
 	 * The number of times to retry reconnecting before dying
 	 *
