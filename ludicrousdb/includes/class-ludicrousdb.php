@@ -169,6 +169,13 @@ class LudicrousDB extends wpdb {
 	 */
 	public $default_lag_threshold = null;
 
+  /**
+	 * In memory cache for tcp connected status.
+	 *
+	 * @private  array
+	 */
+	private $tcp_cache = array();
+
 	/**
 	 * Gets ready to make database connections
 	 *
@@ -1919,7 +1926,8 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Get cached up/down value of previous TCP response
+	 * Get cached up/down value of previous TCP response.
+	 * Look in local cache in case external cache isn't in use or not ready yet. 
 	 *
 	 * @since 3.0.0
 	 *
@@ -1928,7 +1936,17 @@ class LudicrousDB extends wpdb {
 	 * @return mixed Results of wp_cache_get()
 	 */
 	protected function tcp_cache_get( $key ) {
-		return wp_cache_get( $key, 'ludicrousdb' );
+
+		if ( isset( $this->tcp_cache[$key] ) ){
+			return $this->tcp_cache[$key];
+		}
+
+		if ( wp_using_ext_object_cache() ){
+			$this->tcp_cache[$key] =  wp_cache_get( $key, 'ludicrousdb' );
+			return $this->tcp_cache[$key];
+		}
+
+		return false;
 	}
 
 	/**
@@ -1939,9 +1957,13 @@ class LudicrousDB extends wpdb {
 	 * @param string $key   Results of tcp_get_cache_key()
 	 * @param string $value "up" or "down" based on TCP response
 	 *
-	 * @return bool Results of wp_cache_set()
+	 * @return bool Results of wp_cache_set() or true
 	 */
 	protected function tcp_cache_set( $key, $value ) {
-		return wp_cache_set( $key, $value, 'ludicrousdb', $this->tcp_get_cache_expiration() );
+		$this->tcp_cache[$key] = $value;
+		if ( wp_using_ext_object_cache() ){
+			return wp_cache_set( $key, $value, 'ludicrousdb', $this->tcp_get_cache_expiration() );
+		}
+		return true;
 	}
 }
