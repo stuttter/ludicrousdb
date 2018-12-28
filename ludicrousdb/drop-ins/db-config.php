@@ -67,6 +67,12 @@ $wpdb->max_connections = 10;
 $wpdb->check_tcp_responsiveness = true;
 
 /**
+ * The cache group that is used to store TCP responsiveness.
+ * Default: ludicrousdb
+ */
+$wpdb->cache_group = 'ludicrousdb';
+
+/**
  * This is the most basic way to add a server to LudicrousDB using only the
  * required parameters: host, user, password, name.
  * This adds the DB defined in wp-config.php as a read/write server for

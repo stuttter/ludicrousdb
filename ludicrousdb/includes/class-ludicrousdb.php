@@ -176,6 +176,21 @@ class LudicrousDB extends wpdb {
 	 */
 	private $tcp_cache = array();
 
+
+	/**
+	 * A flag to check if global cache group has been added already so it isn't added again.
+	 *
+	 * private bool false.
+	 */
+	private $added_global_group = false;
+
+	/**
+	 * Name of object cache group.
+	 *
+	 * @public string
+	 */
+	public $cache_group = 'ludicrousdb';
+
 	/**
 	 * Gets ready to make database connections
 	 *
@@ -1927,7 +1942,7 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Get cached up/down value of previous TCP response.
-	 * Look in local cache in case external cache isn't in use or not ready yet. 
+	 * Look in local cache in case external cache isn't in use or not ready yet.
 	 *
 	 * @since 3.0.0
 	 *
@@ -1942,7 +1957,8 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( wp_using_ext_object_cache() ){
-			$this->tcp_cache[$key] =  wp_cache_get( $key, 'ludicrousdb' );
+			$this->add_global_group();
+			$this->tcp_cache[$key] =  wp_cache_get( $key, $this->cache_group );
 			return $this->tcp_cache[$key];
 		}
 
@@ -1950,7 +1966,8 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Set cached up/down value of current TCP response
+	 * Set cached up/down value of current TCP response.
+	 * Store in local cache in case external cache isn't in use or not ready yet.
 	 *
 	 * @since 3.0.0
 	 *
@@ -1962,8 +1979,22 @@ class LudicrousDB extends wpdb {
 	protected function tcp_cache_set( $key, $value ) {
 		$this->tcp_cache[$key] = $value;
 		if ( wp_using_ext_object_cache() ){
-			return wp_cache_set( $key, $value, 'ludicrousdb', $this->tcp_get_cache_expiration() );
+			$this->add_global_group();
+			return wp_cache_set( $key, $value, $this->cache_group, $this->tcp_get_cache_expiration() );
 		}
 		return true;
+	}
+
+	/**
+	 * Add global cache group to support multisite.
+	 * Only run once, as that is all that is required.
+	 */
+	protected function add_global_group(){
+		if ( false === $this->added_global_group ) {
+			if ( function_exists( 'wp_cache_add_global_groups' ) ) {
+				wp_cache_add_global_groups( $this->cache_group );
+				$this->added_global_group = true;
+			}
+		}
 	}
 }
