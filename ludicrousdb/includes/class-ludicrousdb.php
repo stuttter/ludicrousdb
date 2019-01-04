@@ -1223,12 +1223,14 @@ class LudicrousDB extends wpdb {
 			 */
 			$return_val = apply_filters_ref_array( 'pre_query', array( null, $query, &$this ) );
 			if ( null !== $return_val ) {
+				$this->run_callbacks('sql_query_log', array( $query, $return_val, $this->last_error ) );
 				return $return_val;
 			}
 		}
 
 		// Bail if query is empty (via application error or 'query' filter)
 		if ( empty( $query ) ) {
+			$this->run_callbacks('sql_query_log', array( $query, $return_val, $this->last_error ) );
 			return $return_val;
 		}
 
@@ -1246,7 +1248,7 @@ class LudicrousDB extends wpdb {
 			if ( $stripped_query !== $query ) {
 				$this->insert_id = 0;
 				$return_val      = false;
-
+				$this->run_callbacks('sql_query_log', array( $query, $return_val, $this->last_error ) );
 				return $return_val;
 			}
 		}
@@ -1275,6 +1277,7 @@ class LudicrousDB extends wpdb {
 			$this->dbh = $this->db_connect( $query );
 
 			if ( ! $this->dbh_type_check( $this->dbh ) ) {
+				$this->run_callbacks('sql_query_log', array( $query, $return_val, $this->last_error ) );
 				return false;
 			}
 
@@ -1324,6 +1327,7 @@ class LudicrousDB extends wpdb {
 		if ( ! empty( $this->last_error ) ) {
 			$this->print_error( $this->last_error );
 			$return_val = false;
+			$this->run_callbacks('sql_query_log', array( $query, $return_val, $this->last_error ) );
 			return $return_val;
 		}
 
@@ -1370,6 +1374,8 @@ class LudicrousDB extends wpdb {
 			$this->num_rows = $num_rows;
 			$return_val     = $num_rows;
 		}
+
+		$this->run_callbacks('sql_query_log', array( $query, $return_val, $this->last_error ) );
 
 		// Some queries are made before plugins are loaded
 		if ( function_exists( 'do_action_ref_array' ) ) {
