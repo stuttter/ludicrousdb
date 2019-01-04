@@ -2,7 +2,7 @@
 
 /**
  * Plugin Name: LudicrousDB
- * Plugin URI:  https://wordpress.org/plugins/ludicrousdb/
+ * Plugin URI:  https://github.com/stuttter/ludicrousdb
  * Author:      John James Jacoby
  * Author URI:  https://jjj.blog
  * License:     GPL v2 or later
