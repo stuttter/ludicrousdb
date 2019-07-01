@@ -702,14 +702,14 @@ class LudicrousDB extends wpdb {
 						if ( $this->select( $name, $this->dbhs[ $dbhname ] ) ) {
 							$this->current_host         = $host_and_port;
 							$this->dbh2host[ $dbhname ] = $host_and_port;
-							$this->last_connection      = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
-							$this->db_connections[]     = $this->last_connection;
-							$this->open_connections[]   = $dbhname;
-							$success                    = true;
-							$queries                    = 1;
-							$lag                        = isset( $this->lag )
-								? $this->lag
-								: 0;
+
+							$queries = isset( $queries ) ? $queries : 1;
+							$lag     = isset( $this->lag ) ? $this->lag : 0;
+
+							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
+							$this->db_connections[]   = $this->last_connection;
+							$this->open_connections[] = $dbhname;
+							$success                  = true;
 							break;
 						}
 					}
