@@ -361,8 +361,15 @@ class LudicrousDB extends wpdb {
 	 * @return bool
 	 */
 	public function is_write_query( $q ) {
-		// Quick and dirty: only SELECT statements are considered read-only.
+		/** Quick and dirty: statemens are considerd read-only when
+		 1. not including UPDATE nor other "may-be-write" strings
+		 2. begin with SELECT etc.
+		 */
 		$q = ltrim( $q, "\r\n\t (" );
+
+		if ( preg_match( '/(?:ALTER|CREATE|ANALYZE|CHECK|OPTIMIZE|REPAIR|CALL|DELETE|DROP|INSERT|LOAD|REPLACE|UPDATE|SET|RENAME)\s/i', $q ) ) {
+			return true;
+		}
 
 		return ! preg_match( '/^(?:SELECT|SHOW|DESCRIBE|DESC|EXPLAIN)\s/i', $q );
 	}
