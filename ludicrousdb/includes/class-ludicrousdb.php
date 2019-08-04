@@ -1311,17 +1311,20 @@ class LudicrousDB extends wpdb {
 		$this->last_query = $query;
 
 		if ( preg_match( '/^\s*SELECT\s+FOUND_ROWS(\s*)/i', $query )
-		     && (
-			     (
-				     ( false === $this->use_mysqli )
-				     && is_resource( $this->last_found_rows_result )
-			     )
-			     ||
-			     (
-				     ( true === $this->use_mysqli )
-				     && ( $this->last_found_rows_result instanceof mysqli_result )
-			     )
-		     )
+			&&
+			(
+				(
+					( false === $this->use_mysqli )
+					&&
+					is_resource( $this->last_found_rows_result )
+				)
+				||
+				(
+					( true === $this->use_mysqli )
+					&&
+					( $this->last_found_rows_result instanceof mysqli_result )
+				)
+			)
 		) {
 			$this->result = $this->last_found_rows_result;
 			$elapsed      = 0;
@@ -1352,20 +1355,14 @@ class LudicrousDB extends wpdb {
 				$this->last_found_rows_result = null;
 			}
 
-
 			if ( ! empty( $this->save_queries ) || ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) ) {
-				if ( is_callable( $this->save_query_callback ) ) {
-					$this->queries[] = call_user_func_array( $this->save_query_callback, array(
-						$query,
-						$elapsed,
-						$this->save_backtrace
-							? debug_backtrace( false )
-							: null,
-						&$this
-					) );
-				} else {
-					$this->queries[] = array( $query, $elapsed, $this->get_caller() );
-				}
+				$this->log_query(
+					$query,
+					$elapsed,
+					$this->get_caller(),
+					$this->time_start,
+					array()
+				);
 			}
 		}
 
@@ -1673,50 +1670,60 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Get the name of the function that called wpdb()
+	 * Logs query data.
 	 *
-	 * @since 1.0.0
+	 * @since 4.3.0
 	 *
-	 * @return string the name of the calling function
+	 * @param string $query           The query's SQL.
+	 * @param float  $query_time      Total time spent on the query, in seconds.
+	 * @param string $query_callstack Comma separated list of the calling functions.
+	 * @param float  $query_start     Unix timestamp of the time at the start of the query.
+	 * @param array  $query_data      Custom query data.
+	 * }
 	 */
-	public function get_caller() {
+	public function log_query( $query = '', $query_time = 0, $query_callstack = '', $query_start = 0, $query_data = array() ) {
 
-		// Bail with a WordPress backtrace
-		if ( function_exists( 'wp_debug_backtrace_summary' ) ) {
-			return wp_debug_backtrace_summary( __CLASS__ );
+		/**
+		 * Filters the custom query data being logged.
+		 *
+		 * Caution should be used when modifying any of this data, it is recommended that any additional
+		 * information you need to store about a query be added as a new associative entry to the fourth
+		 * element $query_data.
+		 *
+		 * @since 5.3.0
+		 *
+		 * @param array  $query_data      Custom query data.
+		 * @param string $query           The query's SQL.
+		 * @param float  $query_time      Total time spent on the query, in seconds.
+		 * @param string $query_callstack Comma separated list of the calling functions.
+		 * @param float  $query_start     Unix timestamp of the time at the start of the query.
+		 */
+		$query_data = apply_filters( 'log_query_custom_data', $query_data, $query, $query_time, $query_callstack, $query_start );
+
+		// Pass to custom callback...
+		if ( is_callable( $this->save_query_callback ) ) {
+			$this->queries[] = call_user_func_array(
+				$this->save_query_callback,
+				array(
+					$query,
+					$query_time,
+					$query_callstack,
+					$query_start,
+					$query_data,
+					&$this
+				)
+			);
+
+		// ...or save it to the queries array
+		} else {
+			$this->queries[] = array(
+				$query,
+				$query_time,
+				$query_callstack,
+				$query_start,
+				$query_data
+			);
 		}
-
-		// Bail as requires at least PHP 4.3+
-		if ( ! is_callable( 'debug_backtrace' ) ) {
-			return '';
-		}
-
-		$bt     = debug_backtrace( false );
-		$caller = '';
-
-		foreach ( (array) $bt as $trace ) {
-			if ( isset( $trace['class'] ) && is_a( $this, $trace['class'] ) ) {
-				continue;
-			} elseif ( ! isset( $trace['function'] ) ) {
-				continue;
-			} elseif ( strtolower( $trace['function'] ) === 'call_user_func_array' ) {
-				continue;
-			} elseif ( strtolower( $trace['function'] ) === 'apply_filters' ) {
-				continue;
-			} elseif ( strtolower( $trace['function'] ) === 'do_action' ) {
-				continue;
-			}
-
-			if ( isset( $trace['class'] ) ) {
-				$caller = $trace['class'] . '::' . $trace['function'];
-			} else {
-				$caller = $trace['function'];
-			}
-
-			break;
-		}
-
-		return $caller;
 	}
 
 	/**
