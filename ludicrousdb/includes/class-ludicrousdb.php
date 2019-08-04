@@ -58,42 +58,42 @@ class LudicrousDB extends wpdb {
 	/**
 	 * The multi-dimensional array of datasets and servers
 	 *
-	 * @public array
+	 * @var array
 	 */
 	public $ludicrous_servers = array();
 
 	/**
 	 * Optional directory of tables and their datasets
 	 *
-	 * @public array
+	 * @var array
 	 */
 	public $ludicrous_tables = array();
 
 	/**
 	 * Optional directory of callbacks to determine datasets from queries
 	 *
-	 * @public array
+	 * @var array
 	 */
 	public $ludicrous_callbacks = array();
 
 	/**
 	 * Custom callback to save debug info in $this->queries
 	 *
-	 * @public callable
+	 * @var callable
 	 */
 	public $save_query_callback = null;
 
 	/**
 	 * Whether to use mysql_pconnect instead of mysql_connect
 	 *
-	 * @public bool
+	 * @var bool
 	 */
 	public $persistent = false;
 
 	/**
 	 * Allow bail if connection fails
 	 *
-	 * @public bool
+	 * @var bool
 	 */
 	public $allow_bail = false;
 
@@ -101,14 +101,14 @@ class LudicrousDB extends wpdb {
 	 * The maximum number of db links to keep open. The least-recently used
 	 * link will be closed when the number of links exceeds this
 	 *
-	 * @public int
+	 * @var int
 	 */
 	public $max_connections = 10;
 
 	/**
 	 * Whether to check with fsockopen prior to mysql_connect
 	 *
-	 * @public bool
+	 * @var bool
 	 */
 	public $check_tcp_responsiveness = true;
 
@@ -139,14 +139,14 @@ class LudicrousDB extends wpdb {
 	 * Send Reads To Masters. This disables slave connections while true.
 	 * Otherwise it is an array of written tables
 	 *
-	 * @public array
+	 * @var array
 	 */
 	public $srtm = array();
 
 	/**
 	 * The log of db connections made and the time each one took
 	 *
-	 * @public array
+	 * @var array
 	 */
 	public $db_connections = array();
 
@@ -158,14 +158,14 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Lookup array (dbhname => host:port)
 	 *
-	 * @public array
+	 * @var array
 	 */
 	public $dbh2host = array();
 
 	/**
 	 * The last server used and the database name selected
 	 *
-	 * @public array
+	 * @var array
 	 */
 	public $last_used_server = array();
 
@@ -173,7 +173,7 @@ class LudicrousDB extends wpdb {
 	 * Lookup array (dbhname => (server, db name) ) for re-selecting the db
 	 * when a link is re-used
 	 *
-	 * @public array
+	 * @var array
 	 */
 	public $used_servers = array();
 
@@ -186,29 +186,28 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Maximum lag in seconds. Set null to disable. Requires callbacks
 	 *
-	 * @public integer
+	 * @var integer
 	 */
 	public $default_lag_threshold = null;
 
 	/**
 	 * In memory cache for tcp connected status.
 	 *
-	 * @private  array
+	 * @var array
 	 */
 	private $tcp_cache = array();
-
 
 	/**
 	 * A flag to check if global cache group has been added already so it isn't added again.
 	 *
-	 * private bool false.
+	 * @val bool
 	 */
 	private $added_global_group = false;
 
 	/**
 	 * Name of object cache group.
 	 *
-	 * @public string
+	 * @var string
 	 */
 	public $cache_group = 'ludicrousdb';
 
@@ -436,7 +435,7 @@ class LudicrousDB extends wpdb {
 			$dataset               = $this->ludicrous_tables[ $this->table ];
 			$this->callback_result = null;
 
-			// Run callbacks and either extract or update dataset
+		// Run callbacks and either extract or update dataset
 		} else {
 
 			// Run callbacks and get result
@@ -494,7 +493,7 @@ class LudicrousDB extends wpdb {
 				$this->srtm[ $this->table ] = true;
 			}
 
-			// Detect queries that have a join in the srtm array.
+		// Detect queries that have a join in the srtm array.
 		} elseif ( ! isset( $use_master ) && is_array( $this->srtm ) && ! empty( $this->srtm ) ) {
 			$use_master  = false;
 			$query_match = substr( $query, 0, 1000 );
@@ -1644,11 +1643,11 @@ class LudicrousDB extends wpdb {
 		if ( $this->dbh_type_check( $dbh_or_table ) ) {
 			$dbh = &$dbh_or_table;
 
-			// Database
+		// Database
 		} elseif ( ( false === $dbh_or_table ) && $this->dbh_type_check( $this->dbh ) ) {
 			$dbh = &$this->dbh;
 
-			// Table name
+		// Table name
 		} elseif ( is_string( $dbh_or_table ) ) {
 			$dbh = $this->db_connect( "SELECT FROM {$dbh_or_table} {$this->users}" );
 		}
@@ -1930,11 +1929,11 @@ class LudicrousDB extends wpdb {
 		if ( 1 === $count ) {
 			$charset = key( $charsets );
 
-			// No charsets, assume this table can store whatever.
+		// No charsets, assume this table can store whatever.
 		} elseif ( 0 === $count ) {
 			$charset = false;
 
-			// More than one charset. Remove latin1 if present and recalculate.
+		// More than one charset. Remove latin1 if present and recalculate.
 		} else {
 			unset( $charsets['latin1'] );
 			$count = count( $charsets );
@@ -1943,11 +1942,11 @@ class LudicrousDB extends wpdb {
 			if ( 1 === $count ) {
 				$charset = key( $charsets );
 
-				// Two charsets, but they're utf8 and utf8mb4, use utf8.
+			// Two charsets, but they're utf8 and utf8mb4, use utf8.
 			} elseif ( 2 === $count && isset( $charsets['utf8'], $charsets['utf8mb4'] ) ) {
 				$charset = 'utf8';
 
-				// Two mixed character sets. ascii.
+			// Two mixed character sets. ascii.
 			} else {
 				$charset = 'ascii';
 			}
@@ -2060,6 +2059,7 @@ class LudicrousDB extends wpdb {
 	 */
 	protected function tcp_cache_set( $key, $value ) {
 		$this->tcp_cache[ $key ] = $value;
+
 		if ( wp_using_ext_object_cache() ) {
 			$this->add_global_group();
 
@@ -2071,7 +2071,10 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Add global cache group to support multisite.
+	 *
 	 * Only run once, as that is all that is required.
+	 *
+	 * @since 4.3.0
 	 */
 	protected function add_global_group() {
 		if ( false === $this->added_global_group ) {
