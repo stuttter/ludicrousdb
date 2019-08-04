@@ -113,6 +113,21 @@ class LudicrousDB extends wpdb {
 	public $check_tcp_responsiveness = true;
 
 	/**
+	 * The amount of time to wait before trying again to ping mysql server.
+	 *
+	 * @var float
+	 */
+	public $recheck_timeout = 0.1;
+
+
+	/**
+	 * Keeps track of the dbhname usage and errors.
+	 * 
+	 * @var array
+	 */
+	public $dbhname_heartbeats = array();
+
+	/**
 	 * The number of times to retry reconnecting before dying
 	 *
 	 * @access protected
@@ -536,7 +551,7 @@ class LudicrousDB extends wpdb {
 			$this->last_used_server = $this->used_servers[ $dbhname ];
 			$this->last_connection  = compact( 'dbhname', 'name' );
 
-			if ( ! $this->check_connection( $this->allow_bail, $this->dbhs[ $dbhname ], $query ) ) {
+			if ( $this->should_mysql_ping( $dbhname ) && ! $this->check_connection( false, $this->dbhs[ $dbhname ] ) ) {
 				if ( isset( $conn['disconnect (ping failed)'] ) ) {
 					++ $conn['disconnect (ping failed)'];
 				} else {
@@ -739,6 +754,7 @@ class LudicrousDB extends wpdb {
 
 				if ( ! empty( $errno ) ) {
 					$msg .= "'errno' => {$errno},\n";
+					$this->dbhname_heartbeats[$dbhname]['last_errno'] = $errno;
 				}
 
 				$msg .= "'tcp_responsive' => " . ( $tcp === true
@@ -1326,6 +1342,7 @@ class LudicrousDB extends wpdb {
 				$this->last_found_rows_result = null;
 			}
 
+
 			if ( ! empty( $this->save_queries ) || ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) ) {
 				if ( is_callable( $this->save_query_callback ) ) {
 					$this->queries[] = call_user_func_array( $this->save_query_callback, array(
@@ -1445,6 +1462,9 @@ class LudicrousDB extends wpdb {
 		} else {
 			$result = mysql_query( $query, $dbh );
 		}
+
+
+		$this->dbhname_heartbeats[$dbh]['last_used'] = microtime( true );
 
 		return $result;
 	}
@@ -1751,6 +1771,33 @@ class LudicrousDB extends wpdb {
 		$this->lag = $this->run_callbacks( 'get_lag_cache' );
 
 		return $this->check_lag();
+	}
+
+
+	/**
+	 * @param $dbh
+	 *
+	 * @return bool
+	 */
+	function should_mysql_ping( $dbh ) {
+		// Shouldn't happen
+		if ( ! isset( $this->dbhname_heartbeats[ $dbh ] ) ) {
+			return true;
+		}
+
+		// MySQL server has gone away
+		if ( isset( $this->dbhname_heartbeats[ $dbh ]['last_errno'] ) && DB_SERVER_GONE_ERROR === $this->dbhname_heartbeats[ $dbh ]['last_errno'] ) {
+			unset( $this->dbhname_heartbeats[ $dbh ]['last_errno'] );
+
+			return true;
+		}
+
+		// More than 0.1 seconds of inactivity on that dbhname
+		if ( microtime( true ) - $this->dbhname_heartbeats[ $dbh ]['last_used'] > $this->recheck_timeout ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**

@@ -20,6 +20,7 @@ function ldb_default_constants() {
 	define( 'DB_LAG_OK',      1 );
 	define( 'DB_LAG_BEHIND',  2 );
 	define( 'DB_LAG_UNKNOWN', 3 );
+	define( 'DB_SERVER_GONE_ERROR', 2006 );
 
 	// The config file was defined earlier.
 	if ( defined( 'DB_CONFIG_FILE' ) && file_exists( DB_CONFIG_FILE ) ) {
