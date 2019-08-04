@@ -119,7 +119,6 @@ class LudicrousDB extends wpdb {
 	 */
 	public $recheck_timeout = 0.1;
 
-
 	/**
 	 * Keeps track of the dbhname usage and errors.
 	 *
@@ -729,7 +728,8 @@ class LudicrousDB extends wpdb {
 							$this->current_host         = $host_and_port;
 							$this->dbh2host[ $dbhname ] = $host_and_port;
 
-							$queries = isset( $queries ) ? $queries : 1;
+							// Define these to avoid undefined variable notices
+							$queries = isset( $queries   ) ? $queries   : 1;
 							$lag     = isset( $this->lag ) ? $this->lag : 0;
 
 							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
