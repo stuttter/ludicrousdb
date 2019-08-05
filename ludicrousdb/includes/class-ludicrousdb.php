@@ -1602,6 +1602,22 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
+	 * Retrieve the name of the function that called wpdb.
+	 *
+	 * Searches up the list of functions until it reaches
+	 * the one that would most logically had called this method.
+	 *
+	 * @since 2.5.0
+	 *
+	 * @return string Comma separated list of the calling functions.
+	 */
+	public function get_caller() {
+		return ( true === $this->save_backtrace )
+			? wp_debug_backtrace_summary( __CLASS__ )
+			: null;
+	}
+
+	/**
 	 * The database version number
 	 *
 	 * @since 1.0.0
