@@ -40,14 +40,6 @@ $wpdb->collate = 'utf8mb4_unicode_ci';
 $wpdb->save_queries = false;
 
 /**
- * recheck_timeout (float)
- * The amount of time to wait before trying again to ping mysql server.
- *
- * Default: 0.1 (Seconds)
- */
-$wpdb->recheck_timeout = 0.1;
-
-/**
  * persistent (bool)
  * This determines whether to use mysql_connect or mysql_pconnect. The effects
  * of this setting may vary and should be carefully tested.

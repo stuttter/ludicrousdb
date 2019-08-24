@@ -113,20 +113,6 @@ class LudicrousDB extends wpdb {
 	public $check_tcp_responsiveness = true;
 
 	/**
-	 * The amount of time to wait before trying again to ping mysql server.
-	 *
-	 * @var float
-	 */
-	public $recheck_timeout = 0.1;
-
-	/**
-	 * Keeps track of the dbhname usage and errors.
-	 *
-	 * @var array
-	 */
-	public $dbhname_heartbeats = array();
-
-	/**
 	 * The number of times to retry reconnecting before dying
 	 *
 	 * @access protected
@@ -222,6 +208,11 @@ class LudicrousDB extends wpdb {
 
 		if ( WP_DEBUG && WP_DEBUG_DISPLAY ) {
 			$this->show_errors();
+		}
+
+		if ( wp_using_ext_object_cache() ) {
+			// used to store the connection for the current page load
+			wp_cache_add_non_persistent_groups( 'non_persistent' );
 		}
 
 		/* Use ext/mysqli if it exists and:
@@ -560,7 +551,7 @@ class LudicrousDB extends wpdb {
 			$this->last_used_server = $this->used_servers[ $dbhname ];
 			$this->last_connection  = compact( 'dbhname', 'name' );
 
-			if ( $this->should_mysql_ping( $dbhname ) && ! $this->check_connection( false, $this->dbhs[ $dbhname ] ) ) {
+			if ( ! $this->check_connection( $this->allow_bail, $this->dbhs[ $dbhname ], $query ) ) {
 				if ( isset( $conn['disconnect (ping failed)'] ) ) {
 					++ $conn['disconnect (ping failed)'];
 				} else {
@@ -728,7 +719,7 @@ class LudicrousDB extends wpdb {
 							$this->dbh2host[ $dbhname ] = $host_and_port;
 
 							// Define these to avoid undefined variable notices
-							$queries = isset( $queries   ) ? $queries   : 1;
+							$queries = isset( $queries ) ? $queries : 1;
 							$lag     = isset( $this->lag ) ? $this->lag : 0;
 
 							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
@@ -764,7 +755,6 @@ class LudicrousDB extends wpdb {
 
 				if ( ! empty( $errno ) ) {
 					$msg .= "'errno' => {$errno},\n";
-					$this->dbhname_heartbeats[$dbhname]['last_errno'] = $errno;
 				}
 
 				$msg .= "'tcp_responsive' => " . ( $tcp === true
@@ -1146,16 +1136,28 @@ class LudicrousDB extends wpdb {
 	public function check_connection( $allow_bail = true, $dbh_or_table = false, $query = '' ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
 
-		if ( $this->dbh_type_check( $dbh ) ) {
-			if ( true === $this->use_mysqli ) {
-				if ( mysqli_ping( $dbh ) ) {
-					return true;
-				}
-			} else {
-				if ( mysql_ping( $dbh ) ) {
-					return true;
+		// we only want to check the connection once per page load, to avoid mysqli_ping slowing down things
+		// this means if the read/write server goes down while the page is loaded, we will have an mysql error instead of graceful failover
+		// however this will happen so rarely & isn't an issue (bc user can just refresh the page) that it's not worth to test/mysqli_ping for every read/write
+		$check_connection = wp_cache_get( $dbh->thread_id, 'non_persistent' );
+		// if the connection was not checked or not established, try to check the connection
+		if( $check_connection === false ) {
+			if ( $this->dbh_type_check( $dbh ) ) {
+				if ( true === $this->use_mysqli ) {
+					if ( mysqli_ping( $dbh ) ) {
+						wp_cache_set( $dbh->thread_id, 'connected', 'non_persistent' );
+						return true;
+					}
+				} else {
+					if ( mysql_ping( $dbh ) ) {
+						wp_cache_set( $dbh->thread_id, 'connected', 'non_persistent' );
+						return true;
+					}
 				}
 			}
+		} else {
+			// if the connection is established & in cache, we can reuse it
+			return true;
 		}
 
 		if ( false === $allow_bail ) {
@@ -1352,7 +1354,6 @@ class LudicrousDB extends wpdb {
 				$this->last_found_rows_result = null;
 			}
 
-
 			if ( ! empty( $this->save_queries ) || ( defined( 'SAVEQUERIES' ) && SAVEQUERIES ) ) {
 				if ( is_callable( $this->save_query_callback ) ) {
 					$this->queries[] = call_user_func_array( $this->save_query_callback, array(
@@ -1472,9 +1473,6 @@ class LudicrousDB extends wpdb {
 		} else {
 			$result = mysql_query( $query, $dbh );
 		}
-
-
-		$this->dbhname_heartbeats[$dbh]['last_used'] = microtime( true );
 
 		return $result;
 	}
@@ -1781,33 +1779,6 @@ class LudicrousDB extends wpdb {
 		$this->lag = $this->run_callbacks( 'get_lag_cache' );
 
 		return $this->check_lag();
-	}
-
-
-	/**
-	 * @param $dbh
-	 *
-	 * @return bool
-	 */
-	function should_mysql_ping( $dbh ) {
-		// Shouldn't happen
-		if ( ! isset( $this->dbhname_heartbeats[ $dbh ] ) ) {
-			return true;
-		}
-
-		// MySQL server has gone away
-		if ( isset( $this->dbhname_heartbeats[ $dbh ]['last_errno'] ) && DB_SERVER_GONE_ERROR === $this->dbhname_heartbeats[ $dbh ]['last_errno'] ) {
-			unset( $this->dbhname_heartbeats[ $dbh ]['last_errno'] );
-
-			return true;
-		}
-
-		// More than 0.1 seconds of inactivity on that dbhname
-		if ( microtime( true ) - $this->dbhname_heartbeats[ $dbh ]['last_used'] > $this->recheck_timeout ) {
-			return true;
-		}
-
-		return false;
 	}
 
 	/**
