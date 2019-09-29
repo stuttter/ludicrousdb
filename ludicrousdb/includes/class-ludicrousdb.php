@@ -430,7 +430,7 @@ class LudicrousDB extends wpdb {
 
 		// can be empty/false if the query is e.g. "COMMIT"
 		$this->table = $this->get_table_from_query( $query );
-		if ( empty( $table ) ) {
+		if ( empty( $this->table ) ) {
 			$this->table = 'no-table';
 		}
 		$this->last_table = $this->table;
