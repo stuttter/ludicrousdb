@@ -27,9 +27,9 @@ $wpdb->charset = 'utf8mb4';
  * This sets the default column collation. For best results, investigate which
  * collation is recommended for your specific character set.
  *
- * Default: utf8mb4_unicode_ci
+ * Default: utf8mb4_unicode_520_ci
  */
-$wpdb->collate = 'utf8mb4_unicode_ci';
+$wpdb->collate = 'utf8mb4_unicode_520_ci';
 
 /**
  * save_queries (bool)
