@@ -1478,8 +1478,7 @@ class LudicrousDB extends wpdb {
 			$result = mysql_query( $query, $dbh );
 		}
 
-
-		$this->dbhname_heartbeats[$dbh]['last_used'] = microtime( true );
+		$this->dbhname_heartbeats[$this->lookup_dbhs_name($dbh)]['last_used'] = microtime( true );
 
 		return $result;
 	}
@@ -2088,5 +2087,22 @@ class LudicrousDB extends wpdb {
 				$this->added_global_group = true;
 			}
 		}
+	}
+
+	/**
+	 * Find a dbhname value for a given $dbh object.
+	 *
+	 * @param object $dbh The dbh object for which to find the dbhname
+	 *
+	 * @return string The dbhname
+	 */
+	private function lookup_dbhs_name($dbh) {
+		foreach ($this->dbhs as $dbhname => $other_dbh) {
+			if ($dbh === $other_dbh) {
+				return $dbhname;
+			}
+		}
+
+		return false;
 	}
 }
