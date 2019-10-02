@@ -1477,6 +1477,52 @@ class LudicrousDB extends wpdb {
 			$result = mysql_query( $query, $dbh );
 		}
 
+		// MySQL server has gone away, try to reconnect
+		$mysql_errno = 0;
+		if ( !empty( $dbh ) ) {
+			if ( true === $this->use_mysqli ) {
+				$mysql_errno = mysqli_errno( $dbh);
+			} else {
+				$mysql_errno = mysql_errno( $dbh );
+			}
+		}
+
+		// if the server gone away, try to reconnect
+		if ( 2006 == $mysql_errno ) {
+			// delete the "connected", as the connection is lost
+			wp_cache_delete( $dbh->thread_id, 'non_persistent' );
+			if ( $this->check_connection() ) {
+				// try the query again
+				if ( true === $this->use_mysqli ) {
+					$result = mysqli_query( $dbh, $query );
+				} else {
+					$result = mysql_query( $query, $dbh );
+				}
+			}
+
+			// need to check again
+			$mysql_errno = 0;
+			if ( !empty( $dbh ) ) {
+				if ( true === $this->use_mysqli ) {
+					$mysql_errno = mysqli_errno( $dbh);
+				} else {
+					$mysql_errno = mysql_errno( $dbh );
+				}
+			}
+		}
+
+		// dont cache pages that include a query that wasn't successful
+		// dont cache objects from now on, as a query failed
+		if ( $mysql_errno !== 0 ) {
+			// DONOTCACHEPAGE isn't official but used by 99% of caching plugins
+			if ( !defined( 'DONOTCACHEPAGE' ) ) {
+				define( 'DONOTCACHEPAGE', true );
+			}
+
+			// don't add anything to object cache anymore
+			wp_suspend_cache_addition( true );
+		}
+
 		return $result;
 	}
 
