@@ -1150,12 +1150,12 @@ class LudicrousDB extends wpdb {
 			if ( $this->dbh_type_check( $dbh ) ) {
 				if ( true === $this->use_mysqli ) {
 					if ( mysqli_ping( $dbh ) ) {
-						wp_cache_set( $dbh->thread_id, 'connected', 'non_persistent' );
+						wp_cache_add( $dbh->thread_id, 'connected', 'non_persistent' );
 						return true;
 					}
 				} else {
 					if ( mysql_ping( $dbh ) ) {
-						wp_cache_set( $dbh->thread_id, 'connected', 'non_persistent' );
+						wp_cache_add( $dbh->thread_id, 'connected', 'non_persistent' );
 						return true;
 					}
 				}
