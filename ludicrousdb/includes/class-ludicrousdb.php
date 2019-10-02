@@ -274,7 +274,7 @@ class LudicrousDB extends wpdb {
 				$collate = 'utf8_general_ci';
 			} else {
 				$charset = 'utf8mb4';
-				$collate = 'utf8mb4_unicode_ci';
+				$collate = 'utf8mb4_unicode_520_ci';
 			}
 		}
 
@@ -296,7 +296,7 @@ class LudicrousDB extends wpdb {
 			unset( $determined );
 		}
 
-		// Set chaset & collation
+		// Set charset & collation
 		$this->charset = $charset;
 		$this->collate = $collate;
 	}
