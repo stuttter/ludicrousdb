@@ -120,6 +120,13 @@ class LudicrousDB extends wpdb {
 	public $recheck_timeout = 0.1;
 
 	/**
+	 * Whether to check for heartbeats
+	 *
+	 * @var bool
+	 */
+	public $check_dbh_heartbeats = true;
+
+	/**
 	 * Keeps track of the dbhname usage and errors.
 	 *
 	 * @var array
@@ -196,13 +203,6 @@ class LudicrousDB extends wpdb {
 	 * @var array
 	 */
 	private $tcp_cache = array();
-
-	/**
-	 * A flag to check if global cache group has been added already so it isn't added again.
-	 *
-	 * @val bool
-	 */
-	private $added_global_group = false;
 
 	/**
 	 * Name of object cache group.
@@ -362,7 +362,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @return bool
 	 */
-	public function is_write_query( $q ) {
+	public function is_write_query( $q = '' ) {
 
 		// Trim potential whitespace or subquery chars
 		$q = ltrim( $q, "\r\n\t (" );
@@ -538,7 +538,9 @@ class LudicrousDB extends wpdb {
 				// existing connection selected a different one.
 				if ( $name != $this->used_servers[ $dbhname ]['name'] ) {
 					if ( ! $this->select( $name, $this->dbhs[ $dbhname ] ) ) {
-						// this can happen when the user varies and lacks permission on the $name database
+
+						// This can happen when the user varies and lacks
+						// permission on the $name database
 						if ( isset( $conn['disconnect (select failed)'] ) ) {
 							++ $conn['disconnect (select failed)'];
 						} else {
@@ -585,7 +587,7 @@ class LudicrousDB extends wpdb {
 			return $this->dbhs[ $dbhname ];
 		}
 
-		if ( ! empty( $use_master ) && defined( "MASTER_DB_DEAD" ) ) {
+		if ( ! empty( $use_master ) && defined( 'MASTER_DB_DEAD' ) ) {
 			return $this->bail( "We are updating the database. Please try back in 5 minutes. If you are posting to your blog please hit the refresh button on your browser in a few minutes to post the data again. It will be posted as soon as the database is back online." );
 		}
 
@@ -602,6 +604,7 @@ class LudicrousDB extends wpdb {
 			foreach ( $this->ludicrous_servers[ $dataset ][ $operation ] as $group => $items ) {
 				$keys = array_keys( $items );
 				shuffle( $keys );
+
 				foreach ( $keys as $key ) {
 					$servers[] = compact( 'group', 'key' );
 				}
@@ -769,7 +772,11 @@ class LudicrousDB extends wpdb {
 
 				if ( ! empty( $errno ) ) {
 					$msg .= "'errno' => {$errno},\n";
-					$this->dbhname_heartbeats[$dbhname]['last_errno'] = $errno;
+
+					// Maybe log the error to heartbeats
+					if ( ! empty( $this->check_dbh_heartbeats ) ) {
+						$this->dbhname_heartbeats[ $dbhname ]['last_errno'] = $errno;
+					}
 				}
 
 				$msg .= "'tcp_responsive' => " . ( $tcp === true
@@ -1475,7 +1482,17 @@ class LudicrousDB extends wpdb {
 			$result = mysql_query( $query, $dbh );
 		}
 
-		$this->dbhname_heartbeats[$this->lookup_dbhs_name($dbh)]['last_used'] = microtime( true );
+		// Maybe log last used to heartbeats
+		if ( ! empty( $this->check_dbh_heartbeats ) ) {
+
+			// Lookup name
+			$name = $this->lookup_dbhs_name( $dbh );
+
+			// Set last used for this dbh
+			if ( ! empty( $name ) ) {
+				$this->dbhname_heartbeats[ $name ]['last_used'] = microtime( true );
+			}
+		}
 
 		return $result;
 	}
@@ -1810,27 +1827,36 @@ class LudicrousDB extends wpdb {
 		return $this->check_lag();
 	}
 
-
 	/**
-	 * @param $dbh
+	 * Should we try to ping the MySQL host?
+	 *
+	 * @since 4.1.0
+	 *
+	 * @param string $dbhname
 	 *
 	 * @return bool
 	 */
-	function should_mysql_ping( $dbh ) {
+	public function should_mysql_ping( $dbhname = '' ) {
+
+		// Bail early if no MySQL ping
+		if ( empty( $this->check_dbh_heartbeats ) ) {
+			return false;
+		}
+
 		// Shouldn't happen
-		if ( ! isset( $this->dbhname_heartbeats[ $dbh ] ) ) {
+		if ( empty( $dbhname ) || empty( $this->dbhname_heartbeats[ $dbhname ] ) ) {
 			return true;
 		}
 
 		// MySQL server has gone away
-		if ( isset( $this->dbhname_heartbeats[ $dbh ]['last_errno'] ) && DB_SERVER_GONE_ERROR === $this->dbhname_heartbeats[ $dbh ]['last_errno'] ) {
-			unset( $this->dbhname_heartbeats[ $dbh ]['last_errno'] );
+		if ( ! empty( $this->dbhname_heartbeats[ $dbhname ]['last_errno'] ) && ( DB_SERVER_GONE_ERROR === $this->dbhname_heartbeats[ $dbhname ]['last_errno'] ) ) {
+			unset( $this->dbhname_heartbeats[ $dbhname ]['last_errno'] );
 
 			return true;
 		}
 
 		// More than 0.1 seconds of inactivity on that dbhname
-		if ( microtime( true ) - $this->dbhname_heartbeats[ $dbh ]['last_used'] > $this->recheck_timeout ) {
+		if ( microtime( true ) - $this->dbhname_heartbeats[ $dbhname ]['last_used'] > $this->recheck_timeout ) {
 			return true;
 		}
 
@@ -2057,14 +2083,23 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @return mixed Results of wp_cache_get()
 	 */
-	protected function tcp_cache_get( $key ) {
+	protected function tcp_cache_get( $key = '' ) {
 
+		// Bail for invalid key
+		if ( empty( $key ) ) {
+			return false;
+		}
+
+		// Return cache value if set
 		if ( isset( $this->tcp_cache[ $key ] ) ) {
 			return $this->tcp_cache[ $key ];
 		}
 
+		// Maybe get from persistent cache
 		if ( wp_using_ext_object_cache() ) {
 			$this->add_global_group();
+
+			// Set value from persistent
 			$this->tcp_cache[ $key ] = wp_cache_get( $key, $this->cache_group );
 
 			return $this->tcp_cache[ $key ];
@@ -2084,9 +2119,17 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @return bool Results of wp_cache_set() or true
 	 */
-	protected function tcp_cache_set( $key, $value ) {
+	protected function tcp_cache_set( $key = '', $value = '' ) {
+
+		// Bail if invalid values were passed
+		if ( empty( $key ) || empty( $value ) ) {
+			return true;
+		}
+
+		// Add value to cache
 		$this->tcp_cache[ $key ] = $value;
 
+		// Maybe add to persistent cache
 		if ( wp_using_ext_object_cache() ) {
 			$this->add_global_group();
 
@@ -2097,35 +2140,50 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Add global cache group to support multisite.
+	 * Add global cache group.
 	 *
 	 * Only run once, as that is all that is required.
 	 *
 	 * @since 4.3.0
 	 */
 	protected function add_global_group() {
-		if ( false === $this->added_global_group ) {
-			if ( function_exists( 'wp_cache_add_global_groups' ) ) {
-				wp_cache_add_global_groups( $this->cache_group );
-				$this->added_global_group = true;
-			}
+		static $added = null;
+
+		// Bail if added or caching not available yet
+		if ( true === $added ) {
+			return;
 		}
+
+		// Add the cache group
+		if ( function_exists( 'wp_cache_add_global_groups' ) ) {
+			wp_cache_add_global_groups( $this->cache_group );
+		}
+
+		// Set added
+		$added = true;
 	}
 
 	/**
-	 * Find a dbhname value for a given $dbh object.
+	 * Find a dbh name value for a given $dbh object.
 	 *
-	 * @param object $dbh The dbh object for which to find the dbhname
+	 * @since 5.0.0
 	 *
-	 * @return string The dbhname
+	 * @param object $dbh The dbh object for which to find the dbh name
+	 *
+	 * @return string The dbh name
 	 */
-	private function lookup_dbhs_name($dbh) {
-		foreach ($this->dbhs as $dbhname => $other_dbh) {
-			if ($dbh === $other_dbh) {
+	private function lookup_dbhs_name( $dbh = false ) {
+
+		// Loop through database hosts and look for this one
+		foreach ( $this->dbhs as $dbhname => $other_dbh ) {
+
+			// Match found so return the key
+			if ( $dbh === $other_dbh ) {
 				return $dbhname;
 			}
 		}
 
+		// No match
 		return false;
 	}
 }
