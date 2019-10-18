@@ -2,11 +2,11 @@
 Contributors: johnjamesjacoby, spacedmonkey
 Tags: mysql, scaling, performance, availability, replication
 Requires at least: 4.8
-Tested up to: 4.9
-Stable tag: 4.1.0
+Tested up to: 5.3
+Stable tag: 5.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
-Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=9Q4F4EL5YJ62J
+Donate link: https://wordpressfoundation.org/donate
 
 LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
 
@@ -78,6 +78,13 @@ One way LudicrousDB differs from WPDB is that LudicrousDB does not attempt to co
 Since LudicrousDB attempts a connection only when a query is made, your WordPress installation will not kill the site with a database error, but will let the code decide what to do next on an unsuccessful query. If you want to do something different, like setting a custom error page or kill the site, you need to define the 'db_connection_error' callback in your db-config.php.
 
 == Changelog ==
+
+= 5.0.0 =
+* PHP 7.3 compatibility
+* Update default collation to unicode_520_ci
+* Global cache group, and add caching to TCP connection statuses
+* Fix a few PHP warnings under some configurations
+* Fix bug causing timeout for ping under some configurations
 
 = 4.1.0 =
 * Fix WordPress 4.8.3 SQLi vulnerability
