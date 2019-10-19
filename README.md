@@ -4,6 +4,8 @@ LudicrousDB is an advanced database interface for WordPress that supports replic
 
 ## Installation
 
+Do both **Files** part and **Drop-ins** part described below. Plugin main code is loaded from `db.php` in "drop-in" style.
+
 ### Files
 
 Copy the main `ludicrousdb` plugin folder & it's contents to either:
