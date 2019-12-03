@@ -353,8 +353,8 @@ class LudicrousDB extends wpdb {
 	 * Determine the likelihood that this query could alter anything
 	 *
 	 * Statements are considered read-only when:
-	 * 1. not including UPDATE nor other "may-be-write" strings
-	 * 2. begin with SELECT etc.
+	 * 1. begin with SELECT witout "FOR UPDATE"
+	 * 2. begin with SHOW, DESCRIBE etc.
 	 *
 	 * @since 1.0.0
 	 *
@@ -367,10 +367,8 @@ class LudicrousDB extends wpdb {
 		// Trim potential whitespace or subquery chars
 		$q = ltrim( $q, "\r\n\t (" );
 
-		// Possible writes
-		if ( preg_match( '/(?:ALTER|CREATE|ANALYZE|CHECK|OPTIMIZE|REPAIR|CALL|DELETE|DROP|INSERT|LOAD|REPLACE|UPDATE|SET|RENAME)\s/i', $q ) ) {
-			return true;
-		}
+		// SELECT ... FOR UPDATE
+		return preg_match( '/^\s*SELECT\s.*\sFOR\s+UPDATE\s/i', $q )
 
 		// Not possible non-writes (phew!)
 		return ! preg_match( '/^(?:SELECT|SHOW|DESCRIBE|DESC|EXPLAIN)\s/i', $q );
