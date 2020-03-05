@@ -40,11 +40,18 @@ This is the most basic way to add a server to LudicrousDB using only the require
 ```
 $wpdb->add_database( array(
 	'host'     => DB_HOST,     // If port is other than 3306, use host:port.
+	'is_socket'=> true,		   // If is true avoid to append the port to the host
 	'user'     => DB_USER,
 	'password' => DB_PASSWORD,
 	'name'     => DB_NAME,
 ) );
 ```
+
+**GCP connection string example**
+```
+:/cloudsql/project_name:region:instance_name
+```
+
 
 This adds the same server again, only this time it is configured as a slave. The last three parameters are set to the defaults but are shown for clarity.
 
