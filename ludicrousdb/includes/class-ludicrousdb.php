@@ -669,7 +669,8 @@ class LudicrousDB extends wpdb {
 					$min_group = $group;
 				}
 
-				$host_and_port = "{$host}:{$port}";
+				// If the variable `is_socket` is setted and is true avoid to add the port
+				$host_and_port = (isset($is_socket) && $is_socket) ? "{$host}": "{$host}:{$port}";
 
 				// Can be used by the lag callbacks
 				$this->lag_cache_key = $host_and_port;
