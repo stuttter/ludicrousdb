@@ -26,5 +26,13 @@
     "wp-coding-standards/wpcs": "^2.2",
     "dealerdirect/phpcodesniffer-composer-installer": "^0.6.2",
     "phpcompatibility/phpcompatibility-wp": "^2.1"
+  },
+  "scripts": {
+    "format": [
+      "vendor/bin/phpcbf ."
+    ],
+    "lint": [
+      "vendor/bin/phpcs ."
+    ]
   }
 }
