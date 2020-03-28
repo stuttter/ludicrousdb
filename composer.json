@@ -29,10 +29,10 @@
   },
   "scripts": {
     "format": [
-      "vendor/bin/phpcbf ."
+      "vendor/bin/phpcbf . -v"
     ],
     "lint": [
-      "vendor/bin/phpcs ."
+      "vendor/bin/phpcs . -v"
     ]
   }
 }
