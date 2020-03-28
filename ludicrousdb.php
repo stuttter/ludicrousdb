@@ -13,7 +13,7 @@
  * License:     GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: ludicrousdb
- * Version:     5.0.0
+ * Version:     5.0.1
  * Description: An advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning.
  */
 
