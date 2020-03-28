@@ -6,12 +6,8 @@
 	<arg value="s" />
 
 	<rule ref="WordPress-Core">
-		<exclude name="Generic.Arrays.DisallowShortArraySyntax" />
-		<exclude name="Generic.PHP.ForbiddenFunctions" />
-		<exclude name="Generic.PHP.Syntax" />
 		<exclude name="PSR2.Classes.PropertyDeclaration.Underscore" />
 		<exclude name="Squiz.PHP.CommentedOutCode.Found" />
-		<exclude name="WordPress.WP.TimezoneChange" />
 		<exclude name="WordPress.PHP.DiscouragedPHPFunctions.runtime_configuration_error_reporting" />
 		<exclude name="WordPress.PHP.DevelopmentFunctions.prevent_path_disclosure_error_reporting" />
 		<exclude name="WordPress.DB.RestrictedFunctions" />
@@ -24,7 +20,12 @@
 	<rule ref="WordPress-Extra"/>
 	<rule ref="WordPress-Docs" />
 	<rule ref="WordPress.WP.I18n">
-		<exclude name="WordPress.WP.I18n.MissingArgDomain" />
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="ludicrousdb" />
+			</property>
+			<property name="check_translator_comments" value="true" />
+		</properties>
 	</rule>
 	<rule ref="PHPCompatibilityWP">
 		<exclude name="PHPCompatibility.Extensions.RemovedExtensions.mysql_DeprecatedRemoved" />
@@ -34,10 +35,5 @@
 
 	<file>.</file>
 
-	<exclude-pattern>*/assets/*</exclude-pattern>
-	<exclude-pattern>*/bin/*</exclude-pattern>
-	<exclude-pattern>*/js/*</exclude-pattern>
-	<exclude-pattern>*/node_modules/*</exclude-pattern>
-	<exclude-pattern>*/tests/coverage/*</exclude-pattern>
 	<exclude-pattern>*/vendor/*</exclude-pattern>
 </ruleset>

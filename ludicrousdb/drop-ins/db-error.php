@@ -48,10 +48,10 @@ if ( is_rtl() ) {
 >
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-	<title><?php esc_html_e( 'Database Error' ); ?></title>
+	<title><?php esc_html_e( 'Database Error', 'ludicrousdb' ); ?></title>
 </head>
 <body>
-<h1><?php esc_html_e( 'Error establishing a database connection' ); ?></h1>
+<h1><?php esc_html_e( 'Error establishing a database connection', 'ludicrousdb' ); ?></h1>
 </body>
 </html>
 <?php

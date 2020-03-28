@@ -499,7 +499,7 @@ class LudicrousDB extends wpdb {
 			return $this->dbh;
 		}
 
-		$is_write = $this->is_write_query( $query )
+		$is_write = $this->is_write_query( $query );
 		// Determine whether the query must be sent to the master (a writable server).
 		if ( ! empty( $use_master ) || ( true === $this->srtm ) || isset( $this->srtm[ $this->table ] ) ) {
 			$use_master = true;
@@ -624,7 +624,7 @@ class LudicrousDB extends wpdb {
 				}
 			}
 
-			$tries_remaining = count( $servers )
+			$tries_remaining = count( $servers );
 			if ( ! $tries_remaining ) {
 				return $this->bail( "No database servers were found to match the query. ({$this->table}, {$dataset})" );
 			}
@@ -708,8 +708,8 @@ class LudicrousDB extends wpdb {
 				$this->timer_start();
 
 				// Connect if necessary or possible.
-				$tcp = $this->check_tcp_responsiveness( $host, $port, $timeout )
-				if ( ! empty( $use_master ) || empty( $tries_remaining ) || empty( $this->check_tcp_responsiveness ) || ( true === $tcp ) ) {
+				$tcp = null;
+				if ( ! empty( $use_master ) || empty( $tries_remaining ) || empty( $this->check_tcp_responsiveness ) || ( true === $this->check_tcp_responsiveness( $host, $port, $timeout ) ) ) {
 					$this->single_db_connect( $dbhname, $host_and_port, $user, $password );
 				} else {
 					$this->dbhs[ $dbhname ] = false;
@@ -718,7 +718,7 @@ class LudicrousDB extends wpdb {
 				$elapsed = $this->timer_stop();
 
 				if ( $this->dbh_type_check( $this->dbhs[ $dbhname ] ) ) {
-					$lagged_status = $this->get_lag()
+					$lagged_status = $this->get_lag();
 					/**
 					 * If we care about lag, disconnect lagged slaves and try to find others.
 					 * We don't disconnect if it is the last lagged slave and it is with the best preference.
