@@ -6,24 +6,26 @@
 	<arg value="s" />
 
 	<rule ref="WordPress-Core">
-		<exclude name="PSR2.Classes.PropertyDeclaration.Underscore" />
-		<exclude name="Squiz.PHP.CommentedOutCode.Found" />
-    <exclude name="Squiz.Commenting" />
-    <exclude name="Squiz.PHP.DisallowMultipleAssignments" />
-    <exclude name="PEAR.Functions.FunctionCallSignature" />
     <exclude name="Generic.Commenting.DocComment.ShortNotCapital" />
-		<exclude name="WordPress.PHP.DiscouragedPHPFunctions.runtime_configuration_error_reporting" />
-		<exclude name="WordPress.PHP.DevelopmentFunctions.prevent_path_disclosure_error_reporting" />
-    <exclude name="WordPress.PHP.YodaConditions.NotYoda" />
-    <exclude name="WordPress.PHP.DontExtract.extract_extract" />
-    <exclude name="WordPress.PHP.StrictComparisons.LooseComparison" />
+    <exclude name="PEAR.Functions.FunctionCallSignature" />
+    <exclude name="PSR2.Classes.PropertyDeclaration.Underscore" />
+    <exclude name="Squiz.Commenting.FunctionComment.ParamCommentFullStop" />
+    <exclude name="Squiz.Commenting.InlineComment.InvalidEndChar" />
+    <exclude name="Squiz.Commenting.FileComment" />
+    <exclude name="Squiz.PHP.CommentedOutCode.Found" />
+    <exclude name="Squiz.PHP.DisallowMultipleAssignments" />
     <exclude name="WordPress.CodeAnalysis.AssignmentInCondition" />
-		<exclude name="WordPress.DB.RestrictedFunctions" />
-		<exclude name="WordPress.Security.EscapeOutput.OutputNotEscaped" />
+    <exclude name="WordPress.DB.RestrictedFunctions" />
+    <exclude name="WordPress.PHP.DontExtract.extract_extract" />
+    <exclude name="WordPress.PHP.DevelopmentFunctions.error_log_wp_debug_backtrace_summary" />
+    <exclude name="WordPress.PHP.DevelopmentFunctions.prevent_path_disclosure_error_reporting" />
+    <exclude name="WordPress.PHP.DiscouragedPHPFunctions.runtime_configuration_error_reporting" />
+    <exclude name="WordPress.PHP.StrictComparisons.LooseComparison" />
+    <exclude name="WordPress.PHP.YodaConditions.NotYoda" />
+    <exclude name="WordPress.Security.EscapeOutput.OutputNotEscaped" />
     <exclude name="WordPress.WhiteSpace.PrecisionAlignment.Found" />
-		<exclude name="WordPress.WP.AlternativeFunctions.file_system_read_fsockopen" />
-		<exclude name="WordPress.WP.AlternativeFunctions.file_system_read_fclose" />
-		<exclude name="WordPress.PHP.DevelopmentFunctions.error_log_wp_debug_backtrace_summary" />
+    <exclude name="WordPress.WP.AlternativeFunctions.file_system_read_fclose" />
+    <exclude name="WordPress.WP.AlternativeFunctions.file_system_read_fsockopen" />
 	</rule>
 
 	<rule ref="WordPress-Extra"/>

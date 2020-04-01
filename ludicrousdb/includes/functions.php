@@ -46,8 +46,8 @@ function ldb_default_constants() {
  *
  * This is backwards-compatible with a procedural config style.
  *
- * @param  string $dataset
- * @param  string $table
+ * @param  string $dataset Database.
+ * @param  string $table   Table name.
  */
 function ldb_add_db_table( $dataset, $table ) {
 	$GLOBALS['wpdb']->add_table( $dataset, $table );

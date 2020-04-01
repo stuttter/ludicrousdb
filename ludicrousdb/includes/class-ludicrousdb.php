@@ -159,6 +159,8 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * The list of unclosed connections sorted by LRU
+	 *
+	 * @var array
 	 */
 	public $open_connections = array();
 
@@ -187,6 +189,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Whether to save debug_backtrace in save_query_callback. You may wish
 	 * to disable this, e.g. when tracing out-of-memory problems.
+	 *
+	 * @var bool
 	 */
 	public $save_backtrace = true;
 
@@ -216,7 +220,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param array db class vars
+	 * @param array $args db class vars
 	 */
 	public function __construct( $args = null ) {
 
@@ -225,7 +229,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		/*
-		 Use ext/mysqli if it exists and:
+		 *  Use ext/mysqli if it exists and:
 		 *  - WP_USE_EXT_MYSQL is defined as false, or
 		 *  - We are a development version of WordPress, or
 		 *  - We are running PHP 5.5 or greater, or
@@ -306,6 +310,8 @@ class LudicrousDB extends wpdb {
 	 * Add the connection parameters for a database
 	 *
 	 * @since 1.0.0
+	 *
+	 * @param array $db Default to empty array.
 	 */
 	public function add_database( array $db = array() ) {
 
@@ -336,6 +342,9 @@ class LudicrousDB extends wpdb {
 	 * Specify the dataset where a table is found
 	 *
 	 * @since 1.0.0
+	 *
+	 * @param string $dataset  Database.
+	 * @param string $table    Table name.
 	 */
 	public function add_table( $dataset, $table ) {
 		$this->ludicrous_tables[ $table ] = $dataset;
@@ -345,6 +354,11 @@ class LudicrousDB extends wpdb {
 	 * Add a callback to a group of callbacks
 	 *
 	 * The default group is 'dataset', used to examine queries & determine dataset
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param function $callback Callback on a dataset.
+	 * @param string   $group    Key name of dataset.
 	 */
 	public function add_callback( $callback, $group = 'dataset' ) {
 		$this->ludicrous_callbacks[ $group ][] = $callback;
@@ -359,7 +373,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string query
+	 * @param string $q Query.
 	 *
 	 * @return bool
 	 */
@@ -391,6 +405,8 @@ class LudicrousDB extends wpdb {
 	 * of them returns something other than null
 	 *
 	 * @since 1.0.0
+	 * @param string $group Group, key name in array.
+	 * @param array  $args   Args passed to callback. Default to null.
 	 */
 	public function run_callbacks( $group, $args = null ) {
 		if ( ! isset( $this->ludicrous_callbacks[ $group ] ) || ! is_array( $this->ludicrous_callbacks[ $group ] ) ) {
@@ -418,7 +434,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string query
+	 * @param string $query Query.
 	 *
 	 * @return resource MySQL database connection
 	 */
@@ -847,7 +863,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $dbhname
+	 * @param string $dbhname Database name.
 	 * @param string $host Internet address: host:port of server on internet.
 	 * @param string $user Database user.
 	 * @param string $password Database password.
@@ -1041,7 +1057,7 @@ class LudicrousDB extends wpdb {
 		}
 	}
 
-	/*
+	/**
 	 * Force addslashes() for the escapes
 	 *
 	 * LudicrousDB makes connections when a query is made which is why we can't
@@ -1052,6 +1068,7 @@ class LudicrousDB extends wpdb {
 	 * See set_charset().
 	 *
 	 * @since 1.0.0
+	 * @param string $string String to escape.
 	 */
 	public function _real_escape( $string ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
 
@@ -1110,7 +1127,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $dbhname
+	 * @param string $dbhname Dataname key name.
 	 */
 	public function disconnect( $dbhname ) {
 
@@ -1237,7 +1254,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $query
+	 * @param string $query Query.
 	 *
 	 * @return int number of rows
 	 */
@@ -1467,7 +1484,7 @@ class LudicrousDB extends wpdb {
 	 * @see wpdb::query()
 	 *
 	 * @param string $query The query to run.
-	 * @param bool   $dbh_or_table
+	 * @param bool   $dbh_or_table  Database or table name. Defaults to false.
 	 */
 	protected function _do_query( $query, $dbh_or_table = false ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
 		$dbh = $this->get_db_object( $dbh_or_table );
@@ -1772,6 +1789,9 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
+	 * @param string $host Host.
+	 * @param int    $port Port or socket.
+	 * @param float  $float_timeout Timeout as float number.
 	 * @return bool true when $host:$post responds within $float_timeout seconds, else false
 	 */
 	public function check_tcp_responsiveness( $host, $port, $float_timeout ) {
@@ -1836,7 +1856,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 4.1.0
 	 *
-	 * @param string $dbhname
+	 * @param string $dbhname Database name.
 	 *
 	 * @return bool
 	 */
@@ -2056,8 +2076,8 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 3.0.0
 	 *
-	 * @param string $host
-	 * @param string $port
+	 * @param string $host Host
+	 * @param string $port Port or socket.
 	 *
 	 * @return string
 	 */
