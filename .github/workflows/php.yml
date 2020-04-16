@@ -7,13 +7,13 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  phpcs:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
-    
+
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
@@ -40,3 +40,4 @@ jobs:
 
     - name: Lint code
       run: vendor/bin/phpcs -q --report=checkstyle | cs2pr --graceful-warnings
+      continue-on-error: true
