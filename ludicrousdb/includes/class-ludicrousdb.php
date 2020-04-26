@@ -509,7 +509,7 @@ class LudicrousDB extends wpdb {
 		// Determine whether the query must be sent to the master (a writable server)
 		if ( ! empty( $use_master ) || ( $this->srtm === true ) || isset( $this->srtm[ $this->table ] ) ) {
 			$use_master = true;
-		} elseif ( $is_write = $this->is_write_query( $query ) ) {
+		} elseif ( $this->is_write_query( $query ) ) {
 			$use_master = true;
 			if ( is_array( $this->srtm ) ) {
 				$this->srtm[ $this->table ] = true;
