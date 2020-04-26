@@ -41,7 +41,7 @@ require_once dirname( __FILE__ ) . '/ludicrousdb/includes/class-ludicrousdb.php'
 ldb_default_constants();
 
 // Create database object
-$wpdb = new LudicrousDB();
+$wpdb = new LudicrousDB(); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 
 // Include LudicrousDB config file if found or set
 if ( defined( 'DB_CONFIG_FILE' ) && file_exists( DB_CONFIG_FILE ) ) {
