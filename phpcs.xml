@@ -16,7 +16,7 @@
     <exclude name="Squiz.PHP.DisallowMultipleAssignments" />
     <exclude name="WordPress.CodeAnalysis.AssignmentInCondition" />
     <exclude name="WordPress.DB.RestrictedFunctions" />
-		<exclude name="WordPress.PHP.DontExtract.extract_extract" />
+    <exclude name="WordPress.PHP.DontExtract.extract_extract" />
     <exclude name="WordPress.PHP.DevelopmentFunctions.error_log_wp_debug_backtrace_summary" />
     <exclude name="WordPress.PHP.DevelopmentFunctions.prevent_path_disclosure_error_reporting" />
     <exclude name="WordPress.PHP.DiscouragedPHPFunctions.runtime_configuration_error_reporting" />
