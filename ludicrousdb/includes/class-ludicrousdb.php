@@ -216,6 +216,20 @@ class LudicrousDB extends wpdb {
 	public $cache_group = 'ludicrousdb';
 
 	/**
+	 * Whether to ignore slave lag.
+	 *
+	 * @var bool
+	 */
+	private $ignore_slave_lag = false;
+
+	/**
+	 * Number of unique servers.
+	 *
+	 * @var int
+	 */
+	private $unique_servers = null;
+
+	/**
 	 * Gets ready to make database connections
 	 *
 	 * @since 1.0.0
@@ -315,17 +329,19 @@ class LudicrousDB extends wpdb {
 	 */
 	public function add_database( array $db = array() ) {
 
-		$dataset = isset( $db['dataset'] )
-			? $db['dataset']
-			: 'global';
+		$database_defaults = array(
+			'dataset'       => 'global',
+			'write'         => 1,
+			'read'          => 1,
+			'timeout'       => 0.2,
+			'port'          => 3306,
+			'lag_threshold' => null,
+		);
 
-		$read = isset( $db['read'] )
-			? (int) $db['read']
-			: 1;
-
-		$write = isset( $db['write'] )
-			? (int) $db['write']
-			: 1;
+		$db      = array_merge($db, $database_defaults);
+		$dataset = $db['dataset'];
+		$read    = $db['read'];
+		$write   = $db['write'];
 
 		unset( $db['dataset'] );
 
@@ -507,7 +523,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Determine whether the query must be sent to the master (a writable server)
-		if ( ! empty( $use_master ) || ( $this->srtm === true ) || isset( $this->srtm[ $this->table ] ) ) {
+		if ( ! empty( $use_master ) || ( $this->srtm === true ) || isset( $this->srtm[ $this->table ] ) ) { // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
 			$use_master = true;
 		} elseif ( $this->is_write_query( $query ) ) {
 			$use_master = true;
@@ -631,8 +647,8 @@ class LudicrousDB extends wpdb {
 				return $this->bail( "No database servers were found to match the query. ({$this->table}, {$dataset})" );
 			}
 
-			if ( ! isset( $unique_servers ) ) {
-				$unique_servers = $tries_remaining;
+			if ( null === $this->unique_servers ) {
+				$this->unique_servers = $tries_remaining;
 			}
 		} while ( $tries_remaining < $this->reconnect_retries );
 
@@ -645,16 +661,25 @@ class LudicrousDB extends wpdb {
 				-- $tries_remaining;
 
 				// If all servers are lagged, we need to start ignoring the lag and retry
-				if ( count( $unique_lagged_slaves ) == $unique_servers ) {
+				if ( count( $unique_lagged_slaves ) == $this->unique_servers ) {
 					break;
 				}
 
 				// $group, $key
-				extract( $group_key, EXTR_OVERWRITE );
+				$group = $group_key['group'];
+				$key   = $group_key['key'];
 
 				// $host, $user, $password, $name, $read, $write [, $lag_threshold, $timeout ]
-				extract( $this->ludicrous_servers[ $dataset ][ $operation ][ $group ][ $key ], EXTR_OVERWRITE );
-				$port = null;
+				$db_config     = $this->ludicrous_servers[ $dataset ][ $operation ][ $group ][ $key ];
+				$host          = $db_config['host'];
+				$user          = $db_config['user'];
+				$password      = $db_config['password'];
+				$name          = $db_config['name'];
+				$write         = $db_config['write'];
+				$read          = $db_config['read'];
+				$timeout       = $db_config['timeout'];
+				$port          = $db_config['port'];
+				$lag_threshold = $db_config['lag_threshold'];
 
 				// Split host:port into $host and $port
 				if ( strpos( $host, ':' ) ) {
@@ -682,7 +707,7 @@ class LudicrousDB extends wpdb {
 				}
 
 				// Get the minimum group here, in case $server rewrites it
-				if ( ! isset( $min_group ) || ( $min_group > $group ) ) {
+				if ( ! isset( $min_group ) || ( $min_group > $group ) ) { // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
 					$min_group = $group;
 				}
 
@@ -695,10 +720,10 @@ class LudicrousDB extends wpdb {
 					: $this->default_lag_threshold;
 
 				// Check for a lagged slave, if applicable
-				if ( empty( $use_master ) && empty( $write ) && ! isset( $ignore_slave_lag ) && isset( $this->lag_threshold ) && ! isset( $server['host'] ) && ( $lagged_status = $this->get_lag_cache() ) === DB_LAG_BEHIND ) {
+				if ( empty( $use_master ) && empty( $write ) && empty ( $this->ignore_slave_lag ) && isset( $this->lag_threshold ) && ! isset( $server['host'] ) && ( $lagged_status = $this->get_lag_cache() ) === DB_LAG_BEHIND ) {
 
 					// If it is the last lagged slave and it is with the best preference we will ignore its lag
-					if ( ! isset( $unique_lagged_slaves[ $host_and_port ] ) && $unique_servers == count( $unique_lagged_slaves ) + 1 && $group == $min_group ) {
+					if ( ! isset( $unique_lagged_slaves[ $host_and_port ] ) && $this->unique_servers == count( $unique_lagged_slaves ) + 1 && $group == $min_group ) {
 						$this->lag_threshold = null;
 					} else {
 						$unique_lagged_slaves[ $host_and_port ] = $this->lag;
@@ -729,13 +754,13 @@ class LudicrousDB extends wpdb {
 					 */
 					if ( empty( $use_master )
 						 && empty( $write )
-						 && ! isset( $ignore_slave_lag )
+						 && empty( $this->ignore_slave_lag )
 						 && isset( $this->lag_threshold )
 						 && ! isset( $server['host'] )
 						 && ( $lagged_status !== DB_LAG_OK )
 						 && ( $lagged_status = $this->get_lag() ) === DB_LAG_BEHIND && ! (
 							! isset( $unique_lagged_slaves[ $host_and_port ] )
-							&& ( $unique_servers == ( count( $unique_lagged_slaves ) + 1 ) )
+							&& ( $this->unique_servers == ( count( $unique_lagged_slaves ) + 1 ) )
 							&& ( $group == $min_group )
 						)
 					) {
@@ -753,7 +778,7 @@ class LudicrousDB extends wpdb {
 							$this->dbh2host[ $dbhname ] = $host_and_port;
 
 							// Define these to avoid undefined variable notices
-							$queries = isset( $queries   ) ? $queries : 1;
+							$queries = isset( $queries   ) ? $queries : 1; // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
 							$lag     = isset( $this->lag ) ? $this->lag : 0;
 
 							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
@@ -813,9 +838,9 @@ class LudicrousDB extends wpdb {
 			) {
 
 				// Lagged slaves were not used. Ignore the lag for this connection attempt and retry.
-				if ( ! isset( $ignore_slave_lag ) && count( $unique_lagged_slaves ) ) {
-					$ignore_slave_lag = true;
-					$tries_remaining  = count( $servers );
+				if ( empty( $this->ignore_slave_lag ) && count( $unique_lagged_slaves ) ) {
+					$this->ignore_slave_lag = true;
+					$tries_remaining        = count( $servers );
 					continue;
 				}
 
@@ -834,15 +859,7 @@ class LudicrousDB extends wpdb {
 			break;
 		} while ( true );
 
-		if ( ! isset( $charset ) ) {
-			$charset = null;
-		}
-
-		if ( ! isset( $collate ) ) {
-			$collate = null;
-		}
-
-		$this->set_charset( $this->dbhs[ $dbhname ], $charset, $collate );
+		$this->set_charset( $this->dbhs[ $dbhname ] );
 
 		$this->dbh                      = $this->dbhs[ $dbhname ]; // needed by $wpdb->_real_escape()
 		$this->last_used_server         = compact( 'host', 'user', 'name', 'read', 'write' );
