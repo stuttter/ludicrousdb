@@ -1686,11 +1686,9 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		if ( $this->use_mysqli ) {
-			$server_info = mysqli_get_server_info( $dbh );
-		} else {
-			$server_info = mysql_get_server_info( $dbh );
-		}
+		$server_info = ( true === $this->use_mysqli )
+				? mysqli_get_server_info( $dbh )
+				: mysql_get_server_info( $dbh );
 
 		return $server_info;
 	}
