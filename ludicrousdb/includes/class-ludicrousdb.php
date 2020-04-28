@@ -1667,6 +1667,19 @@ class LudicrousDB extends wpdb {
 	 * @return false|string false on failure, version number on success
 	 */
 	public function db_version( $dbh_or_table = false ) {
+		return preg_replace( '/[^0-9.].*/', '', $this->db_server_info( $dbh ) );
+	}
+
+	/**
+	 * Retrieves full MySQL server information.
+	 *
+	 * @since 5.0.0
+	 *
+	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
+	 *
+	 * @return string|false Server info on success, false on failure.
+	 */
+	public function db_server_info( $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
 
 		if ( ! $this->dbh_type_check( $dbh ) ) {
@@ -1674,10 +1687,10 @@ class LudicrousDB extends wpdb {
 		}
 
 		$server_info = ( true === $this->use_mysqli )
-			? mysqli_get_server_info( $dbh )
-			: mysql_get_server_info( $dbh );
+				? mysqli_get_server_info( $dbh )
+				: mysql_get_server_info( $dbh );
 
-		return preg_replace( '/[^0-9.].*/', '', $server_info );
+		return $server_info;
 	}
 
 	/**
