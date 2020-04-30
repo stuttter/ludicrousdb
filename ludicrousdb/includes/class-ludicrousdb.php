@@ -329,6 +329,7 @@ class LudicrousDB extends wpdb {
 	 */
 	public function add_database( array $db = array() ) {
 
+		// Setup some sane default values
 		$database_defaults = array(
 			'dataset'       => 'global',
 			'write'         => 1,
@@ -338,17 +339,23 @@ class LudicrousDB extends wpdb {
 			'lag_threshold' => null,
 		);
 
-		$db      = array_merge($db, $database_defaults);
+		// Merge using defaults
+		$db      = array_merge( $db, $database_defaults );
+
+		// Break these apart to make code easier to understand below
 		$dataset = $db['dataset'];
 		$read    = $db['read'];
 		$write   = $db['write'];
 
+		// We do not include the dataset in the array. It's used as a key.
 		unset( $db['dataset'] );
 
+		// Maybe add database to array of read's
 		if ( ! empty( $read ) ) {
 			$this->ludicrous_servers[ $dataset ]['read'][ $read ][] = $db;
 		}
 
+		// Maybe add database to array of write's
 		if ( ! empty( $write ) ) {
 			$this->ludicrous_servers[ $dataset ]['write'][ $write ][] = $db;
 		}
