@@ -654,7 +654,7 @@ class LudicrousDB extends wpdb {
 				return $this->bail( "No database servers were found to match the query. ({$this->table}, {$dataset})" );
 			}
 
-			if ( null === $this->unique_servers ) {
+			if ( is_null( $this->unique_servers ) ) {
 				$this->unique_servers = $tries_remaining;
 			}
 		} while ( $tries_remaining < $this->reconnect_retries );
