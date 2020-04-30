@@ -44,6 +44,12 @@
 
 	<config name="testVersion" value="5.6-" />
 
+	<rule ref="VariableAnalysis.CodeAnalysis.VariableAnalysis">
+		<properties>
+			<property name="validUndefinedVariableNames" value="wpdb server" />
+		</properties>
+	</rule>
+
 	<file>.</file>
 
 	<exclude-pattern>*/vendor/*</exclude-pattern>
