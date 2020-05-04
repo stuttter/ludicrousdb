@@ -1691,6 +1691,7 @@ class LudicrousDB extends wpdb {
 	 * @return false|string false on failure, version number on success
 	 */
 	public function db_version( $dbh_or_table = false ) {
+		$dbh = $this->get_db_object( $dbh_or_table );
 		return preg_replace( '/[^0-9.].*/', '', $this->db_server_info( $dbh ) );
 	}
 
