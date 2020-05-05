@@ -340,7 +340,7 @@ class LudicrousDB extends wpdb {
 		);
 
 		// Merge using defaults
-		$db      = array_merge( $database_defaults, $db );
+		$db      = wp_parse_args( $db, $database_defaults );
 
 		// Break these apart to make code easier to understand below
 		$dataset = $db['dataset'];
