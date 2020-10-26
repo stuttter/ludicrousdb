@@ -24,10 +24,10 @@
 defined( 'ABSPATH' ) || exit;
 
 // Custom directory name
-$ldb_dirname     = defined( 'LDB_DIRNAME'     ) ? LDB_DIRNAME     : 'ludicrousdb';
+$ldb_dirname = defined( 'LDB_DIRNAME'     ) ? LDB_DIRNAME : 'ludicrousdb';
 
 // Supported plugin directories
-$wp_plugin_dir   = defined( 'WP_PLUGIN_DIR'   ) ? WP_PLUGIN_DIR   : WP_CONTENT_DIR . '/plugins';
+$wp_plugin_dir   = defined( 'WP_PLUGIN_DIR'   ) ? WP_PLUGIN_DIR : WP_CONTENT_DIR . '/plugins';
 $wpmu_plugin_dir = defined( 'WPMU_PLUGIN_DIR' ) ? WPMU_PLUGIN_DIR : WP_CONTENT_DIR . '/mu-plugins';
 $wpdb_plugin_dir = defined( 'WPDB_PLUGIN_DIR' ) ? WPDB_PLUGIN_DIR : WP_CONTENT_DIR . '/db-plugins';
 
@@ -35,11 +35,11 @@ $wpdb_plugin_dir = defined( 'WPDB_PLUGIN_DIR' ) ? WPDB_PLUGIN_DIR : WP_CONTENT_D
 if ( file_exists( "{$wp_plugin_dir}/{$ldb_dirname}/ludicrousdb.php" ) ) {
 	require_once "{$wp_plugin_dir}/{$ldb_dirname}/ludicrousdb.php";
 
-// Check /mu-plugins/
+	// Check /mu-plugins/
 } elseif ( file_exists( "{$wpmu_plugin_dir}/{$ldb_dirname}/ludicrousdb.php" ) ) {
 	require_once "{$wpmu_plugin_dir}/{$ldb_dirname}/ludicrousdb.php";
 
-// Check /db-plugins/
+	// Check /db-plugins/
 } elseif ( file_exists( "{$wpdb_plugin_dir}/{$ldb_dirname}/ludicrousdb.php" ) ) {
 	require_once "{$wpdb_plugin_dir}/{$ldb_dirname}/ludicrousdb.php";
 }

@@ -21,5 +21,19 @@
   "require": {
     "php": ">=5.2",
     "composer/installers": "~1.0"
+  },
+  "require-dev": {
+    "wp-coding-standards/wpcs": "^2.2",
+    "dealerdirect/phpcodesniffer-composer-installer": "^0.6.2",
+    "phpcompatibility/phpcompatibility-wp": "^2.1",
+    "sirbrillig/phpcs-variable-analysis": "^2.8"
+  },
+  "scripts": {
+    "format": [
+      "vendor/bin/phpcbf . -v"
+    ],
+    "lint": [
+      "vendor/bin/phpcs . -v"
+    ]
   }
 }
