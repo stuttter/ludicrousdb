@@ -2183,7 +2183,7 @@ class LudicrousDB extends wpdb {
 
 		// Bail if invalid values were passed
 		if ( empty( $key ) || empty( $value ) ) {
-			return true;
+			return false;
 		}
 
 		// Add value to cache
