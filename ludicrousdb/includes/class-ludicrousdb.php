@@ -2134,8 +2134,32 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
+	 * Check if TCP is using a persistent cache or not.
+	 *
+	 * @since 5.1.0
+	 *
+	 * @return bool True if yes. False if no.
+	 */
+	protected function tcp_is_cache_persistent() {
+
+		// Check if using external object cache
+		if ( wp_using_ext_object_cache() ) {
+
+			// Make sure the global group is added
+			$this->add_global_group();
+
+			// Yes
+			return true;
+		}
+
+		// No
+		return false;
+	}
+
+	/**
 	 * Get cached up/down value of previous TCP response.
-	 * Look in local cache in case external cache isn't in use or not ready yet.
+	 *
+	 * Falls back to local cache if persistent cache is not available.
 	 *
 	 * @since 3.0.0
 	 *
@@ -2150,19 +2174,25 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		// Return cache value if set
-		if ( isset( $this->tcp_cache[ $key ] ) ) {
-			return $this->tcp_cache[ $key ];
-		}
+		// Get from persistent cache
+		if ( $this->tcp_is_cache_persistent() ) {
+			return wp_cache_get( $key, $this->cache_group );
 
-		// Maybe get from persistent cache
-		if ( wp_using_ext_object_cache() ) {
-			$this->add_global_group();
+		// Fallback to local cache
+		} elseif ( ! empty( $this->tcp_cache[ $key ] ) ) {
 
-			// Set value from persistent
-			$this->tcp_cache[ $key ] = wp_cache_get( $key, $this->cache_group );
+			// Not expired
+			if ( ! empty( $this->tcp_cache[ $key ]['expiration'] ) && ( time() < $this->tcp_cache[ $key ]['expiration'] ) ) {
 
-			return $this->tcp_cache[ $key ];
+				// Return value or false if empty
+				return ! empty( $this->tcp_cache[ $key ]['value'] )
+					? $this->tcp_cache[ $key ]['value']
+					: false;
+
+			// Expired, so delete and proceed
+			} else {
+				$this->tcp_cache_delete( $key );
+			}
 		}
 
 		return false;
@@ -2170,7 +2200,8 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Set cached up/down value of current TCP response.
-	 * Store in local cache in case external cache isn't in use or not ready yet.
+	 *
+	 * Falls back to local cache if persistent cache is not available.
 	 *
 	 * @since 3.0.0
 	 *
@@ -2186,14 +2217,49 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		// Add value to cache
-		$this->tcp_cache[ $key ] = $value;
+		// Get expiration
+		$expires = $this->tcp_get_cache_expiration();
 
-		// Maybe add to persistent cache
-		if ( wp_using_ext_object_cache() ) {
-			$this->add_global_group();
+		// Add to persistent cache
+		if ( $this->tcp_is_cache_persistent() ) {
+			return wp_cache_set( $key, $value, $this->cache_group, $expires );
 
-			return wp_cache_set( $key, $value, $this->cache_group, $this->tcp_get_cache_expiration() );
+		// Fallback to local cache
+		} else {
+			$this->tcp_cache[ $key ] = array(
+				'value'      => $value,
+				'expiration' => time() + $expires
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Delete cached up/down value of current TCP response.
+	 *
+	 * Falls back to local cache if persistent cache is not available.
+	 *
+	 * @since 5.1.0
+	 *
+	 * @param string $key Results of tcp_get_cache_key()
+	 *
+	 * @return bool Results of wp_cache_delete() or true
+	 */
+	protected function tcp_cache_delete( $key = '' ) {
+
+		// Bail if invalid key
+		if ( empty( $key ) ) {
+			return false;
+		}
+
+		// Delete from persistent cache
+		if ( $this->tcp_is_cache_persistent() ) {
+			return wp_cache_delete( $key, $this->cache_group );
+
+		// Fallback to local cache
+		} else {
+			unset( $this->tcp_cache[ $key ] );
 		}
 
 		return true;
