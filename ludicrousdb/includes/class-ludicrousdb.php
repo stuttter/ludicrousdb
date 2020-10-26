@@ -740,13 +740,13 @@ class LudicrousDB extends wpdb {
 
 				$this->timer_start();
 
+				// Maybe check TCP responsiveness
+				$tcp = ! empty( $this->check_tcp_responsiveness )
+					? $this->check_tcp_responsiveness( $host, $port, $timeout )
+					: null;
+
 				// Connect if necessary or possible
-				$tcp = null;
-				if ( ! empty( $use_master )
-					 || empty( $tries_remaining )
-					 || empty( $this->check_tcp_responsiveness )
-					 || ( true === $tcp = $this->check_tcp_responsiveness( $host, $port, $timeout ) )
-				) {
+				if ( ! empty( $use_master ) || empty( $tries_remaining ) || ( true === $tcp ) ) {
 					$this->single_db_connect( $dbhname, $host_and_port, $user, $password );
 				} else {
 					$this->dbhs[ $dbhname ] = false;
