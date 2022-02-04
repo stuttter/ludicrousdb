@@ -746,7 +746,7 @@ class LudicrousDB extends wpdb {
 					: null;
 
 				// Connect if necessary or possible
-				if ( ! empty( $use_master ) || empty( $tries_remaining ) || ( true === $tcp ) ) {
+				if ( ! empty( $use_master ) || empty( $tries_remaining ) || ( true === $tcp ) || ! isset( $this->last_connection ) ) {
 					$this->single_db_connect( $dbhname, $host_and_port, $user, $password );
 				} else {
 					$this->dbhs[ $dbhname ] = false;
