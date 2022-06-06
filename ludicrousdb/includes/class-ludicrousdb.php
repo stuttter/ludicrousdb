@@ -44,7 +44,7 @@ class LudicrousDB extends wpdb {
 	/**
 	 * The current MySQL link resource
 	 *
-	 * @var resource
+	 * @var mysqli|resource|false|null
 	 */
 	public $dbh;
 
