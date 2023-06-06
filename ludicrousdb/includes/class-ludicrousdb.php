@@ -471,6 +471,10 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
+		if ( $this->use_mysqli ) {
+			mysqli_report( MYSQLI_REPORT_OFF );
+		}
+
 		// can be empty/false if the query is e.g. "COMMIT"
 		$this->table = $this->get_table_from_query( $query );
 		if ( empty( $this->table ) ) {
@@ -914,8 +918,8 @@ class LudicrousDB extends wpdb {
 
 			// mysqli_real_connect doesn't support the host param including a port or socket
 			// like mysql_connect does. This duplicates how mysql_connect detects a port and/or socket file.
-			$port           = null;
-			$socket         = null;
+			$port           = 0;
+			$socket         = '';
 			$port_or_socket = strstr( $host, ':' );
 
 			if ( ! empty( $port_or_socket ) ) {
@@ -943,7 +947,7 @@ class LudicrousDB extends wpdb {
 				$pre_host = 'p:';
 			}
 
-			mysqli_real_connect( $this->dbhs[ $dbhname ], $pre_host . $host, $user, $password, null, $port, $socket, $client_flags );
+			mysqli_real_connect( $this->dbhs[ $dbhname ], $pre_host . $host, $user, $password, '', $port, $socket, $client_flags );
 
 			if ( $this->dbhs[ $dbhname ]->connect_errno ) {
 				$this->dbhs[ $dbhname ] = false;
