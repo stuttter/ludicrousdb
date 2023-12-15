@@ -409,7 +409,7 @@ class LudicrousDB extends wpdb {
 		$q = ltrim( $q, "\r\n\t (" );
 
 		// Possible writes
-		if ( preg_match( '/(?:^|\s)(?:ALTER|CREATE|ANALYZE|CHECK|OPTIMIZE|REPAIR|CALL|DELETE|DROP|INSERT|LOAD|REPLACE|UPDATE|SET|RENAME\s+TABLE)(?:\s|$)/i', $q ) ) {
+		if ( preg_match( '/(?:^|\s)(?:ALTER|CREATE|ANALYZE|CHECK|OPTIMIZE|REPAIR|CALL|DELETE|DROP|INSERT|LOAD|REPLACE|UPDATE|SET|RENAME\s+TABLE|[a-z]+_LOCKS?\()(?:\s|$)/i', $q ) ) {
 			return true;
 		}
 
@@ -469,6 +469,10 @@ class LudicrousDB extends wpdb {
 		// Bail if empty query
 		if ( empty( $query ) ) {
 			return false;
+		}
+
+		if ( $this->use_mysqli ) {
+			mysqli_report( MYSQLI_REPORT_OFF );
 		}
 
 		// can be empty/false if the query is e.g. "COMMIT"
@@ -914,8 +918,8 @@ class LudicrousDB extends wpdb {
 
 			// mysqli_real_connect doesn't support the host param including a port or socket
 			// like mysql_connect does. This duplicates how mysql_connect detects a port and/or socket file.
-			$port           = null;
-			$socket         = null;
+			$port           = 0;
+			$socket         = '';
 			$port_or_socket = strstr( $host, ':' );
 
 			if ( ! empty( $port_or_socket ) ) {
@@ -943,7 +947,7 @@ class LudicrousDB extends wpdb {
 				$pre_host = 'p:';
 			}
 
-			mysqli_real_connect( $this->dbhs[ $dbhname ], $pre_host . $host, $user, $password, null, $port, $socket, $client_flags );
+			mysqli_real_connect( $this->dbhs[ $dbhname ], $pre_host . $host, $user, $password, '', $port, $socket, $client_flags );
 
 			if ( $this->dbhs[ $dbhname ]->connect_errno ) {
 				$this->dbhs[ $dbhname ] = false;
@@ -1102,7 +1106,7 @@ class LudicrousDB extends wpdb {
 	public function _real_escape( $string ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
 
 		// Slash the query part
-		$escaped = addslashes( $string );
+		$escaped = addslashes( $string ?? '' );
 
 		// Maybe use WordPress core placeholder method
 		if ( method_exists( $this, 'add_placeholder_escape' ) ) {
