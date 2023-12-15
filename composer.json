@@ -2,7 +2,7 @@
   "name": "stuttter/ludicrousdb",
   "description": "LudicrousDB is a database class that supports replication, failover, load balancing, & partitioning, based on Automattic's HyperDB drop-in.",
   "homepage": "https://github.com/stuttter/ludicrousdb",
-  "type": "wordpress-muplugin",
+  "type": "wordpress-plugin",
   "license"    : "GPL-2.0-or-later",
   "authors": [
     {
