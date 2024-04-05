@@ -2,7 +2,7 @@
   "name": "stuttter/ludicrousdb",
   "description": "LudicrousDB is a database class that supports replication, failover, load balancing, & partitioning, based on Automattic's HyperDB drop-in.",
   "homepage": "https://github.com/stuttter/ludicrousdb",
-  "type": "wordpress-muplugin",
+  "type": "wordpress-plugin",
   "license"    : "GPL-2.0-or-later",
   "authors": [
     {
@@ -14,7 +14,7 @@
       "email": "jon@spacedmonkey.co.uk"
     }
   ],
-  "support"    : {
+  "support": {
     "issues": "https://github.com/stuttter/ludicrousdb/issues",
     "source": "https://github.com/stuttter/ludicrousdb"
   },
@@ -23,10 +23,10 @@
     "composer/installers": "~1.0 || ~2.0"
   },
   "require-dev": {
-    "wp-coding-standards/wpcs": "^2.2",
-    "dealerdirect/phpcodesniffer-composer-installer": "^0.6.2",
-    "phpcompatibility/phpcompatibility-wp": "^2.1",
-    "sirbrillig/phpcs-variable-analysis": "^2.8"
+    "wp-coding-standards/wpcs": "*",
+    "dealerdirect/phpcodesniffer-composer-installer": "*",
+    "phpcompatibility/phpcompatibility-wp": "*",
+    "sirbrillig/phpcs-variable-analysis": "*"
   },
   "scripts": {
     "format": [
@@ -35,5 +35,11 @@
     "lint": [
       "vendor/bin/phpcs . -v"
     ]
+  },
+  "config": {
+    "allow-plugins": {
+      "composer/installers": true,
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
   }
 }

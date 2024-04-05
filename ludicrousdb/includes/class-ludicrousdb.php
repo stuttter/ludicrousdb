@@ -409,7 +409,7 @@ class LudicrousDB extends wpdb {
 		$q = ltrim( $q, "\r\n\t (" );
 
 		// Possible writes
-		if ( preg_match( '/(?:^|\s)(?:ALTER|CREATE|ANALYZE|CHECK|OPTIMIZE|REPAIR|CALL|DELETE|DROP|INSERT|LOAD|REPLACE|UPDATE|SET|RENAME\s+TABLE)(?:\s|$)/i', $q ) ) {
+		if ( preg_match( '/(?:^|\s)(?:ALTER|CREATE|ANALYZE|CHECK|OPTIMIZE|REPAIR|CALL|DELETE|DROP|INSERT|LOAD|REPLACE|UPDATE|SET|RENAME\s+TABLE|[a-z]+_LOCKS?\()(?:\s|$)/i', $q ) ) {
 			return true;
 		}
 
@@ -456,7 +456,7 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Figure out which db server should handle the query, and connect to it
+	 * Figure out which db server should handle the query, and connect to it.
 	 *
 	 * @since 1.0.0
 	 *
@@ -471,7 +471,13 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		// can be empty/false if the query is e.g. "COMMIT"
+		// Fix error reporting change (in PHP 8.1) causing fatal errors
+		// See: https://php.watch/versions/8.1/mysqli-error-mode
+		if ( true === $this->use_mysqli ) {
+			mysqli_report( MYSQLI_REPORT_OFF );
+		}
+
+		// Can be empty/false if the query is e.g. "COMMIT"
 		$this->table = $this->get_table_from_query( $query );
 		if ( empty( $this->table ) ) {
 			$this->table = 'no-table';
@@ -914,8 +920,8 @@ class LudicrousDB extends wpdb {
 
 			// mysqli_real_connect doesn't support the host param including a port or socket
 			// like mysql_connect does. This duplicates how mysql_connect detects a port and/or socket file.
-			$port           = null;
-			$socket         = null;
+			$port           = 0;
+			$socket         = '';
 			$port_or_socket = strstr( $host, ':' );
 
 			if ( ! empty( $port_or_socket ) ) {
@@ -943,7 +949,7 @@ class LudicrousDB extends wpdb {
 				$pre_host = 'p:';
 			}
 
-			mysqli_real_connect( $this->dbhs[ $dbhname ], $pre_host . $host, $user, $password, null, $port, $socket, $client_flags );
+			mysqli_real_connect( $this->dbhs[ $dbhname ], $pre_host . $host, $user, $password, '', $port, $socket, $client_flags );
 
 			if ( $this->dbhs[ $dbhname ]->connect_errno ) {
 				$this->dbhs[ $dbhname ] = false;
@@ -962,15 +968,19 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Change the current SQL mode, and ensure its WordPress compatibility
+	 * Change the current SQL mode, and ensure its WordPress compatibility.
 	 *
 	 * If no modes are passed, it will ensure the current MySQL server
-	 * modes are compatible
+	 * modes are compatible.
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param array                 $modes Optional. A list of SQL modes to set.
-	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
+	 * @param array                        $modes        Optional. A list of SQL modes to set.
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
+	 *                                                   - the current database
+	 *                                                   - the database housing the specified table
+	 *                                                   - the database of the MySQL resource
+	 * @return void
 	 */
 	public function set_sql_mode( $modes = array(), $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
@@ -990,13 +1000,15 @@ class LudicrousDB extends wpdb {
 				return;
 			}
 
+			$modes_str = '';
+
 			if ( true === $this->use_mysqli ) {
 				$modes_array = mysqli_fetch_array( $res );
 				if ( empty( $modes_array[0] ) ) {
 					return;
 				}
 				$modes_str = $modes_array[0];
-			} else {
+			} elseif ( function_exists( 'mysql_result' ) ) {
 				$modes_str = mysql_result( $res, 0 );
 			}
 
@@ -1031,15 +1043,18 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Selects a database using the current database connection
+	 * Selects a database using the current database connection.
 	 *
 	 * The database name will be changed based on the current database
-	 * connection. On failure, the execution will bail and display an DB error
+	 * connection. On failure, the execution will bail and display an DB error.
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string                $db MySQL database name
-	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
+	 * @param string                       $db           MySQL database name.
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
+	 *                                                   - the current database
+	 *                                                   - the database housing the specified table
+	 *                                                   - the database of the MySQL resource
 	 */
 	public function select( $db, $dbh_or_table = false ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
@@ -1101,6 +1116,11 @@ class LudicrousDB extends wpdb {
 	 */
 	public function _real_escape( $string ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
 
+		// Bail if not a scalar
+		if ( ! is_scalar( $string ) ) {
+			return '';
+		}
+
 		// Slash the query part
 		$escaped = addslashes( $string );
 
@@ -1117,35 +1137,47 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param resource $dbh The resource given by mysql_connect
-	 * @param string   $charset The character set (optional)
-	 * @param string   $collate The collation (optional)
+	 * @param mysqli|resource $dbh     The resource given by mysqli_connect
+	 * @param string          $charset Optional. The character set.
+	 * @param string          $collate Optional. The collation.
 	 */
 	public function set_charset( $dbh, $charset = null, $collate = null ) {
 		if ( ! isset( $charset ) ) {
 			$charset = $this->charset;
 		}
+
 		if ( ! isset( $collate ) ) {
 			$collate = $this->collate;
 		}
+
 		if ( empty( $charset ) || empty( $collate ) ) {
 			wp_die( "{$charset}  {$collate}" );
 		}
-		if ( ! in_array( strtolower( $charset ), array( 'utf8', 'utf8mb4', 'latin1' ), true ) ) {
+
+		$allowed = array( 'utf8', 'utf8mb4', 'latin1' );
+
+		if ( ! in_array( strtolower( $charset ), $allowed, true ) ) {
 			wp_die( "{$charset} charset isn't supported in LudicrousDB for security reasons" );
 		}
-		if ( $this->has_cap( 'collation', $dbh ) && ! empty( $charset ) ) {
+
+		if ( ! empty( $charset ) && $this->has_cap( 'collation', $dbh ) ) {
 			$set_charset_succeeded = true;
-			if ( ( true === $this->use_mysqli ) && function_exists( 'mysqli_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
-				$set_charset_succeeded = mysqli_set_charset( $dbh, $charset );
-			} elseif ( function_exists( 'mysql_set_charset' ) && $this->has_cap( 'set_charset', $dbh ) ) {
-				$set_charset_succeeded = mysql_set_charset( $charset, $dbh );
+
+			if ( $this->has_cap( 'set_charset', $dbh ) ) {
+				if ( ( true === $this->use_mysqli ) && function_exists( 'mysqli_set_charset' ) ) {
+					$set_charset_succeeded = mysqli_set_charset( $dbh, $charset );
+				} elseif ( function_exists( 'mysql_set_charset' ) ) {
+					$set_charset_succeeded = mysql_set_charset( $charset, $dbh );
+				}
 			}
-			if ( $set_charset_succeeded ) {
+
+			if ( true === $set_charset_succeeded ) {
 				$query = $this->prepare( 'SET NAMES %s', $charset );
+
 				if ( ! empty( $collate ) ) {
 					$query .= $this->prepare( ' COLLATE %s', $collate );
 				}
+
 				$this->_do_query( $query, $dbh );
 			}
 		}
@@ -1543,13 +1575,16 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Closes the current database connection
+	 * Closes the current database connection.
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
+	 *                                                   - the current database
+	 *                                                   - the database housing the specified table
+	 *                                                   - the database of the MySQL resource
 	 *
-	 * @return bool True if the connection was successfully closed, false if it wasn't,
+	 * @return bool True if the connection was successfully closed. False if it wasn't
 	 *              or the connection doesn't exist.
 	 */
 	public function close( $dbh_or_table = false ) {
@@ -1574,14 +1609,17 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Whether or not MySQL database is at least the required minimum version.
-	 * The additional argument allows the caller to check a specific database
+	 * The additional argument allows the caller to check a specific database.
 	 *
 	 * @since 1.0.0
 	 *
 	 * @global $wp_version
 	 * @global $required_mysql_version
 	 *
-	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
+	 *                                                   - the current database
+	 *                                                   - the database housing the specified table
+	 *                                                   - the database of the MySQL resource
 	 *
 	 * @return WP_Error
 	 */
@@ -1597,14 +1635,18 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * This function is called when WordPress is generating the table schema to determine whether or not the current database
-	 * supports or needs the collation statements
+	 * This function is called when WordPress is generating the table schema to
+	 * determine whether or not the current database supports or needs the
+	 * collation statements.
 	 *
-	 * The additional argument allows the caller to check a specific database
+	 * The additional argument allows the caller to check a specific database.
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
+	 *                                                   - the current database
+	 *                                                   - the database housing the specified table
+	 *                                                   - the database of the MySQL resource
 	 *
 	 * @return bool
 	 */
@@ -1615,13 +1657,16 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Generic function to determine if a database supports a particular feature
-	 * The additional argument allows the caller to check a specific database
+	 * Generic function to determine if a database supports a particular feature.
+	 * The additional argument allows the caller to check a specific database.
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string                $db_cap the feature
-	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
+	 * @param string                       $db_cap       The feature.
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
+	 *                                                   - the current database
+	 *                                                   - the database housing the specified table
+	 *                                                   - the database of the MySQL resource
 	 *
 	 * @return bool
 	 */
@@ -1686,13 +1731,16 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * The database version number
+	 * The database version number.
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
+	 *                                                   - the current database
+	 *                                                   - the database housing the specified table
+	 *                                                   - the database of the MySQL resource
 	 *
-	 * @return false|string false on failure, version number on success
+	 * @return false|string False on failure. Version number on success.
 	 */
 	public function db_version( $dbh_or_table = false ) {
 		return preg_replace( '/[^0-9.].*/', '', $this->db_server_info( $dbh_or_table ) );
@@ -1703,7 +1751,10 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
+	 *                                                   - the current database
+	 *                                                   - the database housing the specified table
+	 *                                                   - the database of the MySQL resource
 	 *
 	 * @return string|false Server info on success, false on failure.
 	 */
@@ -1726,7 +1777,11 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param false|string|resource $dbh_or_table the database (the current database, the database housing the specified table, or the database of the MySQL resource)
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
+	 *                                                   - the current database
+	 *                                                   - the database housing the specified table
+	 *                                                   - the database of the MySQL resource
+	 * @return false|mysqli|resource
 	 */
 	private function get_db_object( $dbh_or_table = false ) {
 
@@ -1737,11 +1792,11 @@ class LudicrousDB extends wpdb {
 		if ( $this->dbh_type_check( $dbh_or_table ) ) {
 			$dbh = &$dbh_or_table;
 
-			// Database
+		// Database
 		} elseif ( ( false === $dbh_or_table ) && $this->dbh_type_check( $this->dbh ) ) {
 			$dbh = &$this->dbh;
 
-			// Table name
+		// Table name
 		} elseif ( is_string( $dbh_or_table ) ) {
 			$dbh = $this->db_connect( "SELECT FROM {$dbh_or_table} {$this->users}" );
 		}
@@ -1752,9 +1807,9 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Check database object type.
 	 *
-	 * @param resource|mysqli $dbh Database resource.
-	 *
 	 * @since 1.0.0
+	 *
+	 * @param mysqli|resource $dbh Database resource.
 	 *
 	 * @return bool
 	 */
