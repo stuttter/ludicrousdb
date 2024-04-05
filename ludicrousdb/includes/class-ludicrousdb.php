@@ -1116,7 +1116,7 @@ class LudicrousDB extends wpdb {
 	 */
 	public function _real_escape( $string ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
 
-		// Override if not a string
+		// Bail if not a scalar
 		if ( ! is_scalar( $string ) ) {
 			return '';
 		}
