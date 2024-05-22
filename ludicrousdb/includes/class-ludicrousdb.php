@@ -1455,7 +1455,15 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		$result = mysqli_query( $dbh, $query );
+		try {
+				$result = mysqli_query( $dbh, $query );
+		} catch ( Throwable $exception ) {
+			if ( true === $this->suppress_errors ) {
+				$result = false;
+			} else {
+				throw $exception;
+			}
+		}
 
 		// Maybe log last used to heartbeats
 		if ( ! empty( $this->check_dbh_heartbeats ) ) {
