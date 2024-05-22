@@ -245,23 +245,6 @@ class LudicrousDB extends wpdb {
 			$this->show_errors();
 		}
 
-		/*
-		 *  Use ext/mysqli if it exists and:
-		 *  - WP_USE_EXT_MYSQL is defined as false, or
-		 *  - We are a development version of WordPress, or
-		 *  - We are running PHP 5.5 or greater, or
-		 *  - ext/mysql is not loaded.
-		 */
-		if ( function_exists( 'mysqli_connect' ) ) {
-			if ( defined( 'WP_USE_EXT_MYSQL' ) ) {
-				$this->use_mysqli = ! WP_USE_EXT_MYSQL;
-			} elseif ( version_compare( phpversion(), '5.5', '>=' ) || ! function_exists( 'mysql_connect' ) ) {
-				$this->use_mysqli = true;
-			} elseif ( false !== strpos( $GLOBALS['wp_version'], '-' ) ) {
-				$this->use_mysqli = true;
-			}
-		}
-
 		// Maybe override class vars
 		if ( is_array( $args ) ) {
 			$class_vars = array_keys( get_class_vars( __CLASS__ ) );
@@ -473,9 +456,7 @@ class LudicrousDB extends wpdb {
 
 		// Fix error reporting change (in PHP 8.1) causing fatal errors
 		// See: https://php.watch/versions/8.1/mysqli-error-mode
-		if ( true === $this->use_mysqli ) {
-			mysqli_report( MYSQLI_REPORT_OFF );
-		}
+		mysqli_report( MYSQLI_REPORT_OFF );
 
 		// Can be empty/false if the query is e.g. "COMMIT"
 		$this->table = $this->get_table_from_query( $query );
@@ -813,13 +794,8 @@ class LudicrousDB extends wpdb {
 				$this->db_connections[] = $this->last_connection;
 
 				if ( $this->dbh_type_check( $this->dbhs[ $dbhname ] ) ) {
-					if ( true === $this->use_mysqli ) {
-						$error = mysqli_error( $this->dbhs[ $dbhname ] );
-						$errno = mysqli_errno( $this->dbhs[ $dbhname ] );
-					} else {
-						$error = mysql_error( $this->dbhs[ $dbhname ] );
-						$errno = mysql_errno( $this->dbhs[ $dbhname ] );
-					}
+					$error = mysqli_error( $this->dbhs[ $dbhname ] );
+					$errno = mysqli_errno( $this->dbhs[ $dbhname ] );
 				}
 
 				$msg  = date( 'Y-m-d H:i:s' ) . " Can't select {$dbhname} - \n"; // phpcs:ignore WordPress.DateTime.RestrictedFunctions.date_date
@@ -915,55 +891,45 @@ class LudicrousDB extends wpdb {
 		$new_link     = defined( 'MYSQL_NEW_LINK' ) ? MYSQL_NEW_LINK : true;
 		$client_flags = defined( 'MYSQL_CLIENT_FLAGS' ) ? MYSQL_CLIENT_FLAGS : 0;
 
-		if ( true === $this->use_mysqli ) {
-			$this->dbhs[ $dbhname ] = mysqli_init();
+		$this->dbhs[ $dbhname ] = mysqli_init();
 
-			// mysqli_real_connect doesn't support the host param including a port or socket
-			// like mysql_connect does. This duplicates how mysql_connect detects a port and/or socket file.
-			$port           = 0;
-			$socket         = '';
-			$port_or_socket = strstr( $host, ':' );
+		// mysqli_real_connect doesn't support the host param including a port or socket
+		// like mysql_connect does. This duplicates how mysql_connect detects a port and/or socket file.
+		$port           = 0;
+		$socket         = '';
+		$port_or_socket = strstr( $host, ':' );
 
-			if ( ! empty( $port_or_socket ) ) {
-				$host           = substr( $host, 0, strpos( $host, ':' ) );
-				$port_or_socket = substr( $port_or_socket, 1 );
+		if ( ! empty( $port_or_socket ) ) {
+			$host           = substr( $host, 0, strpos( $host, ':' ) );
+			$port_or_socket = substr( $port_or_socket, 1 );
 
-				if ( 0 !== strpos( $port_or_socket, '/' ) ) {
-					$port         = intval( $port_or_socket );
-					$maybe_socket = strstr( $port_or_socket, ':' );
+			if ( 0 !== strpos( $port_or_socket, '/' ) ) {
+				$port         = intval( $port_or_socket );
+				$maybe_socket = strstr( $port_or_socket, ':' );
 
-					if ( ! empty( $maybe_socket ) ) {
-						$socket = substr( $maybe_socket, 1 );
-					}
-				} else {
-					$socket = $port_or_socket;
+				if ( ! empty( $maybe_socket ) ) {
+					$socket = substr( $maybe_socket, 1 );
 				}
+			} else {
+				$socket = $port_or_socket;
 			}
+		}
 
-			// Detail found here - https://core.trac.wordpress.org/ticket/31018
-			$pre_host = '';
+		// Detail found here - https://core.trac.wordpress.org/ticket/31018
+		$pre_host = '';
 
-			// If DB_HOST begins with a 'p:', allow it to be passed to mysqli_real_connect().
-			// mysqli supports persistent connections starting with PHP 5.3.0.
-			if ( ( true === $this->persistent ) && version_compare( phpversion(), '5.3.0', '>=' ) ) {
-				$pre_host = 'p:';
-			}
+		// If DB_HOST begins with a 'p:', allow it to be passed to mysqli_real_connect().
+		// mysqli supports persistent connections starting with PHP 5.3.0.
+		if ( ( true === $this->persistent ) && version_compare( phpversion(), '5.3.0', '>=' ) ) {
+			$pre_host = 'p:';
+		}
 
-			mysqli_real_connect( $this->dbhs[ $dbhname ], $pre_host . $host, $user, $password, '', $port, $socket, $client_flags );
+		mysqli_real_connect( $this->dbhs[ $dbhname ], $pre_host . $host, $user, $password, '', $port, $socket, $client_flags );
 
-			if ( $this->dbhs[ $dbhname ]->connect_errno ) {
-				$this->dbhs[ $dbhname ] = false;
+		if ( $this->dbhs[ $dbhname ]->connect_errno ) {
+			$this->dbhs[ $dbhname ] = false;
 
-				return false;
-			}
-		} else {
-
-			// Check if functions exists (they do not in PHP 7)
-			if ( ( true === $this->persistent ) && function_exists( 'mysql_pconnect' ) ) {
-				$this->dbhs[ $dbhname ] = mysql_pconnect( $host, $user, $password, $new_link, $client_flags );
-			} elseif ( function_exists( 'mysql_connect' ) ) {
-				$this->dbhs[ $dbhname ] = mysql_connect( $host, $user, $password, $new_link, $client_flags );
-			}
+			return false;
 		}
 	}
 
@@ -990,27 +956,18 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( empty( $modes ) ) {
-			if ( true === $this->use_mysqli ) {
-				$res = mysqli_query( $dbh, 'SELECT @@SESSION.sql_mode' );
-			} else {
-				$res = mysql_query( 'SELECT @@SESSION.sql_mode', $dbh );
-			}
+			$res = mysqli_query( $dbh, 'SELECT @@SESSION.sql_mode' );
 
 			if ( empty( $res ) ) {
 				return;
 			}
 
-			$modes_str = '';
-
-			if ( true === $this->use_mysqli ) {
-				$modes_array = mysqli_fetch_array( $res );
-				if ( empty( $modes_array[0] ) ) {
-					return;
-				}
-				$modes_str = $modes_array[0];
-			} elseif ( function_exists( 'mysql_result' ) ) {
-				$modes_str = mysql_result( $res, 0 );
+			$modes_array = mysqli_fetch_array( $res );
+			if ( empty( $modes_array[0] ) ) {
+				return;
 			}
+
+			$modes_str = $modes_array[0];
 
 			if ( empty( $modes_str ) ) {
 				return;
@@ -1035,11 +992,7 @@ class LudicrousDB extends wpdb {
 
 		$modes_str = implode( ',', $modes );
 
-		if ( true === $this->use_mysqli ) {
-			mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" );
-		} else {
-			mysql_query( "SET SESSION sql_mode='{$modes_str}'", $dbh );
-		}
+		mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" );
 	}
 
 	/**
@@ -1063,11 +1016,7 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		if ( true === $this->use_mysqli ) {
-			$success = mysqli_select_db( $dbh, $db );
-		} else {
-			$success = mysql_select_db( $db, $dbh );
-		}
+		$success = mysqli_select_db( $dbh, $db );
 
 		return $success;
 	}
@@ -1088,16 +1037,10 @@ class LudicrousDB extends wpdb {
 
 		$this->col_info = array();
 
-		if ( true === $this->use_mysqli ) {
-			$num_fields = mysqli_num_fields( $this->result );
-			for ( $i = 0; $i < $num_fields; $i ++ ) {
-				$this->col_info[ $i ] = mysqli_fetch_field( $this->result );
-			}
-		} else {
-			$num_fields = mysql_num_fields( $this->result );
-			for ( $i = 0; $i < $num_fields; $i ++ ) {
-				$this->col_info[ $i ] = mysql_fetch_field( $this->result, $i );
-			}
+		$num_fields = mysqli_num_fields( $this->result );
+
+		for ( $i = 0; $i < $num_fields; $i ++ ) {
+			$this->col_info[ $i ] = mysqli_fetch_field( $this->result );
 		}
 	}
 
@@ -1164,11 +1107,7 @@ class LudicrousDB extends wpdb {
 			$set_charset_succeeded = true;
 
 			if ( $this->has_cap( 'set_charset', $dbh ) ) {
-				if ( ( true === $this->use_mysqli ) && function_exists( 'mysqli_set_charset' ) ) {
-					$set_charset_succeeded = mysqli_set_charset( $dbh, $charset );
-				} elseif ( function_exists( 'mysql_set_charset' ) ) {
-					$set_charset_succeeded = mysql_set_charset( $charset, $dbh );
-				}
+				$set_charset_succeeded = mysqli_set_charset( $dbh, $charset );
 			}
 
 			if ( true === $set_charset_succeeded ) {
@@ -1235,16 +1174,8 @@ class LudicrousDB extends wpdb {
 	public function check_connection( $allow_bail = true, $dbh_or_table = false, $query = '' ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
 
-		if ( $this->dbh_type_check( $dbh ) ) {
-			if ( true === $this->use_mysqli ) {
-				if ( mysqli_ping( $dbh ) ) {
-					return true;
-				}
-			} else {
-				if ( mysql_ping( $dbh ) ) {
-					return true;
-				}
-			}
+		if ( $this->dbh_type_check( $dbh ) && mysqli_ping( $dbh ) ) {
+			return true;
 		}
 
 		if ( false === $allow_bail ) {
@@ -1401,19 +1332,7 @@ class LudicrousDB extends wpdb {
 
 		if ( preg_match( '/^\s*SELECT\s+FOUND_ROWS(\s*)/i', $query )
 			&&
-			(
-				(
-					( false === $this->use_mysqli )
-					&&
-					is_resource( $this->last_found_rows_result )
-				)
-				||
-				(
-					( true === $this->use_mysqli )
-					&&
-					( $this->last_found_rows_result instanceof mysqli_result )
-				)
-			)
+			( $this->last_found_rows_result instanceof mysqli_result )
 		) {
 			$this->result = $this->last_found_rows_result;
 			$elapsed      = 0;
@@ -1457,11 +1376,7 @@ class LudicrousDB extends wpdb {
 
 		// If there is an error then take note of it
 		if ( $this->dbh_type_check( $this->dbh ) ) {
-			if ( true === $this->use_mysqli ) {
-				$this->last_error = mysqli_error( $this->dbh );
-			} else {
-				$this->last_error = mysql_error( $this->dbh );
-			}
+			$this->last_error = mysqli_error( $this->dbh );
 		}
 
 		if ( ! empty( $this->last_error ) ) {
@@ -1475,19 +1390,11 @@ class LudicrousDB extends wpdb {
 		if ( preg_match( '/^\s*(create|alter|truncate|drop)\s/i', $query ) ) {
 			$return_val = $this->result;
 		} elseif ( preg_match( '/^\\s*(insert|delete|update|replace|alter) /i', $query ) ) {
-			if ( true === $this->use_mysqli ) {
-				$this->rows_affected = mysqli_affected_rows( $this->dbh );
-			} else {
-				$this->rows_affected = mysql_affected_rows( $this->dbh );
-			}
+			$this->rows_affected = mysqli_affected_rows( $this->dbh );
 
 			// Take note of the insert_id
 			if ( preg_match( '/^\s*(insert|replace)\s/i', $query ) ) {
-				if ( true === $this->use_mysqli ) {
-					$this->insert_id = mysqli_insert_id( $this->dbh );
-				} else {
-					$this->insert_id = mysql_insert_id( $this->dbh );
-				}
+				$this->insert_id = mysqli_insert_id( $this->dbh );
 			}
 
 			// Return number of rows affected
@@ -1496,15 +1403,10 @@ class LudicrousDB extends wpdb {
 			$num_rows          = 0;
 			$this->last_result = array();
 
-			if ( ( true === $this->use_mysqli ) && ( $this->result instanceof mysqli_result ) ) {
+			if ( $this->result instanceof mysqli_result ) {
 				$this->load_col_info();
+
 				while ( $row = mysqli_fetch_object( $this->result ) ) {
-					$this->last_result[ $num_rows ] = $row;
-					$num_rows ++;
-				}
-			} elseif ( is_resource( $this->result ) ) {
-				$this->load_col_info();
-				while ( $row = mysql_fetch_object( $this->result ) ) {
 					$this->last_result[ $num_rows ] = $row;
 					$num_rows ++;
 				}
@@ -1554,11 +1456,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		try {
-			if ( true === $this->use_mysqli ) {
 				$result = mysqli_query( $dbh, $query );
-			} else {
-				$result = mysql_query( $query, $dbh );
-			}
 		} catch ( Throwable $exception ) {
 			if ( true === $this->suppress_errors ) {
 				$result = false;
@@ -1602,11 +1500,7 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		if ( true === $this->use_mysqli ) {
-			$closed = mysqli_close( $dbh );
-		} else {
-			$closed = mysql_close( $dbh );
-		}
+		$closed = mysqli_close( $dbh );
 
 		if ( ! empty( $closed ) ) {
 			$this->dbh = null;
@@ -1696,11 +1590,7 @@ class LudicrousDB extends wpdb {
 				$dbh = $this->get_db_object( $dbh_or_table );
 
 				if ( $this->dbh_type_check( $dbh ) ) {
-					if ( true === $this->use_mysqli ) {
-						$client_version = mysqli_get_client_info();
-					} else {
-						$client_version = mysql_get_client_info( $dbh );
-					}
+					$client_version = mysqli_get_client_info();
 
 					/*
 					 * libmysql has supported utf8mb4 since 5.5.3, same as the MySQL server.
@@ -1773,9 +1663,7 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		$server_info = ( true === $this->use_mysqli )
-				? mysqli_get_server_info( $dbh )
-				: mysql_get_server_info( $dbh );
+		$server_info = mysqli_get_server_info( $dbh );
 
 		return $server_info;
 	}
@@ -1789,7 +1677,7 @@ class LudicrousDB extends wpdb {
 	 *                                                   - the current database
 	 *                                                   - the database housing the specified table
 	 *                                                   - the database of the MySQL resource
-	 * @return false|mysqli|resource
+	 * @return bool|mysqli|resource
 	 */
 	private function get_db_object( $dbh_or_table = false ) {
 
@@ -1822,7 +1710,7 @@ class LudicrousDB extends wpdb {
 	 * @return bool
 	 */
 	private function dbh_type_check( $dbh ) {
-		if ( ( true === $this->use_mysqli ) && ( $dbh instanceof mysqli ) ) {
+		if ( $dbh instanceof mysqli ) {
 			return true;
 		} elseif ( is_resource( $dbh ) ) {
 			return true;
@@ -2161,9 +2049,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Fetch row
-		$row = ( true === $this->use_mysqli )
-			? mysqli_fetch_row( $result )
-			: mysql_fetch_row( $result );
+		$row = mysqli_fetch_row( $result );
 
 		// Bail with error if no rows
 		if ( ! is_array( $row ) || count( $row ) < 1 ) {
