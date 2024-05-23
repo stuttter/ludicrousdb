@@ -1,12 +1,15 @@
 === LudicrousDB ===
-Contributors: johnjamesjacoby, spacedmonkey
-Tags: mysql, scaling, performance, availability, replication
-Requires at least: 4.8
-Tested up to: 5.3
-Stable tag: 5.0.0
-License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
-Donate link: https://wordpressfoundation.org/donate
+Contributors:      johnjamesjacoby, spacedmonkey
+Author:            Triple J Software, Inc.
+Author URI:        https://jjj.software
+Plugin URI:        https://github.com/stuttter/ludicrousdb/
+License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+License:           GPLv2 or later
+Tags:              database, mysql, performance, scaling, wpdb
+Requires PHP:      7.0
+Requires at least: 5.0
+Tested up to:      6.5
+Stable tag:        5.2.0
 
 LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
 
@@ -79,6 +82,11 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 
 == Changelog ==
 
+= 5.2.0 =
+* PHP 8.3 compatibility
+* Update default collation to utf8mb4_unicode_520_ci
+* Fix a few PHP warnings under some configurations
+
 = 5.0.0 =
 * PHP 7.3 compatibility
 * Update default collation to unicode_520_ci
@@ -91,10 +99,10 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 
 = 4.0.0 =
 * Support for custom mu / plugin paths
-* Improved WordPress 4.6 capability 
+* Improved WordPress 4.6 capability
 * New filter - pre_query
 * New action - queried
-* Allow db-config.php file to stored in wp-content directory. 
+* Allow db-config.php file to stored in wp-content directory.
 
 = 3.0.0 =
 * Improved support for mu-plugins installation location
