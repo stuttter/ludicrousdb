@@ -245,18 +245,35 @@ class LudicrousDB extends wpdb {
 			$this->show_errors();
 		}
 
-		// Maybe override class vars
-		if ( is_array( $args ) ) {
-			$class_vars = array_keys( get_class_vars( __CLASS__ ) );
-			foreach ( $class_vars as $var ) {
-				if ( isset( $args[ $var ] ) ) {
-					$this->{$var} = $args[ $var ];
-				}
-			}
+		// Maybe override class variables
+		if ( ! empty( $args ) && is_array( $args ) ) {
+			$this->set_class_vars( $args );
+		}
+	}
+
+	/**
+	 * Sets class vars from an array of arguments.
+	 *
+	 * @since 5.2.0
+	 * @param array $args Array of variables to set.
+	 */
+	protected function set_class_vars( $args = array() ) {
+
+		// Bail if empty arguments
+		if ( empty( $args ) ) {
+			return;
 		}
 
-		// Set collation and character set
-		$this->init_charset();
+		// Get class vars as array of keys
+		$class_vars     = get_class_vars( __CLASS__ );
+		$class_var_keys = array_keys( $class_vars );
+
+		// Loop through class vars and override if set in $args
+		foreach ( $class_var_keys as $var ) {
+			if ( isset( $args[ $var ] ) ) {
+				$this->{$var} = $args[ $var ];
+			}
+		}
 	}
 
 	/**
@@ -267,21 +284,10 @@ class LudicrousDB extends wpdb {
 	 * @global array $wp_global
 	 */
 	public function init_charset() {
-		global $wp_version;
 
 		// Defaults
-		$charset = $collate = '';
-
-		// Multisite
-		if ( function_exists( 'is_multisite' ) && is_multisite() ) {
-			if ( version_compare( $wp_version, '4.2', '<' ) ) {
-				$charset = 'utf8';
-				$collate = 'utf8_general_ci';
-			} else {
-				$charset = 'utf8mb4';
-				$collate = 'utf8mb4_unicode_520_ci';
-			}
-		}
+		$charset = 'utf8mb4';
+		$collate = 'utf8mb4_unicode_520_ci';
 
 		// Use constant if defined
 		if ( defined( 'DB_COLLATE' ) ) {
@@ -293,17 +299,12 @@ class LudicrousDB extends wpdb {
 			$charset = DB_CHARSET;
 		}
 
-		// determine_charset is only in WordPress 4.6
-		if ( method_exists( $this, 'determine_charset' ) ) {
-			$determined = $this->determine_charset( $charset, $collate );
-			$charset    = $determined['charset'];
-			$collate    = $determined['collate'];
-			unset( $determined );
-		}
+		// Determine charset and collate
+		$charset_collate = $this->determine_charset( $charset, $collate );
 
-		// Set charset & collation
-		$this->charset = $charset;
-		$this->collate = $collate;
+		// Set charset and collate
+		$this->charset = $charset_collate['charset'];
+		$this->collate = $charset_collate['collate'];
 	}
 
 	/**
@@ -1456,7 +1457,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		try {
-				$result = mysqli_query( $dbh, $query );
+			$result = mysqli_query( $dbh, $query );
 		} catch ( Throwable $exception ) {
 			if ( true === $this->suppress_errors ) {
 				$result = false;
