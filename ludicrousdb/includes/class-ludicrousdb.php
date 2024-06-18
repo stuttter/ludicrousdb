@@ -765,7 +765,13 @@ class LudicrousDB extends wpdb {
 				) {
 
 					// If it is the last lagged slave and it is with the best preference we will ignore its lag
-					if ( ! isset( $unique_lagged_slaves[ $host_and_port ] ) && ( (int) $this->unique_servers === count( $unique_lagged_slaves ) + 1 ) && $group == $min_group ) {
+					if (
+						! isset( $unique_lagged_slaves[ $host_and_port ] )
+						&&
+						( (int) $this->unique_servers === count( $unique_lagged_slaves ) + 1 )
+						&&
+						( $group === $min_group )
+					) {
 						$this->lag_threshold = null;
 					} else {
 						$unique_lagged_slaves[ $host_and_port ] = $this->lag;
@@ -795,16 +801,16 @@ class LudicrousDB extends wpdb {
 					 * We don't disconnect if it is the last lagged slave and it is with the best preference.
 					 */
 					if ( empty( $use_master )
-						 && empty( $write )
-						 && empty( $this->ignore_slave_lag )
-						 && isset( $this->lag_threshold )
-						 && ! isset( $server['host'] )
-						 && ( $lagged_status !== DB_LAG_OK )
-						 && ( $lagged_status = $this->get_lag() ) === DB_LAG_BEHIND
-						 && ! (
+						&& empty( $write )
+						&& empty( $this->ignore_slave_lag )
+						&& isset( $this->lag_threshold )
+						&& ! isset( $server['host'] )
+						&& ( $lagged_status !== DB_LAG_OK )
+						&& ( $lagged_status = $this->get_lag() ) === DB_LAG_BEHIND // phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition
+						&& ! (
 							! isset( $unique_lagged_slaves[ $host_and_port ] )
 							&& ( (int) $this->unique_servers === ( count( $unique_lagged_slaves ) + 1 ) )
-							&& ( $group == $min_group )
+							&& ( $group === $min_group )
 						)
 					) {
 						$unique_lagged_slaves[ $host_and_port ] = $this->lag;
