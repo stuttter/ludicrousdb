@@ -236,18 +236,43 @@ class LudicrousDB extends wpdb {
 	 * Gets ready to make database connections
 	 *
 	 * @since 1.0.0
+	 * @since 5.2.0 Matched parameters to parent wpdb class
 	 *
-	 * @param array $args db class vars
+	 * @param array|string $dbuser     New class variables, or Database user.
+	 * @param string       $dbpassword Database password.
+	 * @param string       $dbname     Database name.
+	 * @param string       $dbhost     Database host.
 	 */
-	public function __construct( $args = null ) {
+	public function __construct( $dbuser = '', $dbpassword = '', $dbname = '', $dbhost = '' ) {
 
 		if ( WP_DEBUG && WP_DEBUG_DISPLAY ) {
 			$this->show_errors();
 		}
 
-		// Maybe override class variables
-		if ( ! empty( $args ) && is_array( $args ) ) {
-			$this->set_class_vars( $args );
+		// Bail if first method parameter is empty
+		if ( empty( $dbuser ) ) {
+			return;
+		}
+
+		// Default class vars
+		$class_vars = array();
+
+		// Custom class vars via array of arguments
+		if ( is_array( $dbuser ) ) {
+			$class_vars = $dbuser;
+
+		// WPDB style parameter pattern
+		} elseif ( is_string( $dbuser ) ) {
+
+			// Only compact if all params are not empty
+			if ( ! empty( $dbpassword ) && ! empty( $dbname ) && ! empty( $dbhost ) ) {
+				$class_vars = compact( $dbuser, $dbpassword, $dbname, $dbhost );
+			}
+		}
+
+		// Only set vars if there are vars to set
+		if ( ! empty( $class_vars ) ) {
+			$this->set_class_vars( $class_vars );
 		}
 	}
 
@@ -471,7 +496,7 @@ class LudicrousDB extends wpdb {
 			$dataset               = $this->ludicrous_tables[ $this->table ];
 			$this->callback_result = null;
 
-			// Run callbacks and either extract or update dataset
+		// Run callbacks and either extract or update dataset
 		} else {
 
 			// Run callbacks and get result
@@ -555,34 +580,42 @@ class LudicrousDB extends wpdb {
 		// Try to reuse an existing connection
 		while ( isset( $this->dbhs[ $dbhname ] ) && $this->dbh_type_check( $this->dbhs[ $dbhname ] ) ) {
 
-			// Find the connection for incrementing counters
-			foreach ( array_keys( $this->db_connections ) as $i ) {
-				if ( $this->db_connections[ $i ]['dbhname'] == $dbhname ) {
-					$conn = &$this->db_connections[ $i ];
+			// Get the connection indexes
+			$conns = array_keys( $this->db_connections );
+			$conn  = 0;
+
+			// Loop through connections to find the matching dbhname
+			if ( ! empty( $conns ) ) {
+				foreach ( $conns as $i ) {
+					if ( $this->db_connections[ $i ]['dbhname'] === $dbhname ) {
+						$conn = (int) $i;
+					}
 				}
 			}
 
-			if ( isset( $server['name'] ) ) {
-				$name = $server['name'];
+			// Try to use the database name from the callback, if scalar
+			if ( ! empty( $server['name'] ) && is_scalar( $server['name'] ) ) {
+				$name = (string) $server['name'];
 
-				// A callback has specified a database name so it's possible the
+				// A callback specified a database name, but it is possible the
 				// existing connection selected a different one.
-				if ( $name != $this->used_servers[ $dbhname ]['name'] ) {
+				if ( $name !== $this->used_servers[ $dbhname ]['name'] ) {
+
+					// If the select fails, disconnect and try again
 					if ( ! $this->select( $name, $this->dbhs[ $dbhname ] ) ) {
 
 						// This can happen when the user varies and lacks
 						// permission on the $name database
-						if ( isset( $conn['disconnect (select failed)'] ) ) {
-							++ $conn['disconnect (select failed)'];
-						} else {
-							$conn['disconnect (select failed)'] = 1;
-						}
-
+						$this->increment_db_connection( $conn, 'disconnect (select failed)' );
 						$this->disconnect( $dbhname );
 						break;
 					}
+
+					// Update the used server name
 					$this->used_servers[ $dbhname ]['name'] = $name;
 				}
+
+			// Otherwise, use the name from the last connection
 			} else {
 				$name = $this->used_servers[ $dbhname ]['name'];
 			}
@@ -599,22 +632,15 @@ class LudicrousDB extends wpdb {
 			$this->last_used_server = $this->used_servers[ $dbhname ];
 			$this->last_connection  = compact( 'dbhname', 'name' );
 
+			// Check if the connection is still alive
 			if ( $this->should_mysql_ping( $dbhname ) && ! $this->check_connection( false, $this->dbhs[ $dbhname ] ) ) {
-				if ( isset( $conn['disconnect (ping failed)'] ) ) {
-					++ $conn['disconnect (ping failed)'];
-				} else {
-					$conn['disconnect (ping failed)'] = 1;
-				}
-
+				$this->increment_db_connection( $conn, 'disconnect (ping failed)' );
 				$this->disconnect( $dbhname );
 				break;
 			}
 
-			if ( isset( $conn['queries'] ) ) {
-				++ $conn['queries'];
-			} else {
-				$conn['queries'] = 1;
-			}
+			// Increment the connection counter
+			$this->increment_db_connection( $conn, 'queries' );
 
 			return $this->dbhs[ $dbhname ];
 		}
@@ -643,7 +669,7 @@ class LudicrousDB extends wpdb {
 			}
 
 			$tries_remaining = count( $servers );
-			if ( $tries_remaining === 0  ) {
+			if ( $tries_remaining === 0 ) {
 				return $this->bail( "No database servers were found to match the query. ({$this->table}, {$dataset})" );
 			}
 
@@ -669,16 +695,16 @@ class LudicrousDB extends wpdb {
 				$group = $group_key['group'];
 				$key   = $group_key['key'];
 
-				// $host, $user, $password, $name, $read, $write [, $lag_threshold, $timeout ]
+				// $host, $port, $user, $password, $name, $read, $write, $lag_threshold, $timeout ]
 				$db_config     = $this->ludicrous_servers[ $dataset ][ $operation ][ $group ][ $key ];
 				$host          = $db_config['host'];
+				$port          = $db_config['port'];
 				$user          = $db_config['user'];
 				$password      = $db_config['password'];
 				$name          = $db_config['name'];
 				$write         = $db_config['write'];
 				$read          = $db_config['read'];
 				$timeout       = $db_config['timeout'];
-				$port          = $db_config['port'];
 				$lag_threshold = $db_config['lag_threshold'];
 
 				// Split host:port into $host and $port
@@ -687,8 +713,12 @@ class LudicrousDB extends wpdb {
 				}
 
 				// Overlay $server if it was extracted from a callback
-				if ( isset( $server ) && is_array( $server ) ) {
+				if ( ! empty( $server ) && is_array( $server ) ) {
 					extract( $server, EXTR_OVERWRITE );
+
+				// Otherwise, set $server to an empty array
+				} else {
+					$server = array();
 				}
 
 				// Split again in case $server had host:port
@@ -758,7 +788,8 @@ class LudicrousDB extends wpdb {
 						 && isset( $this->lag_threshold )
 						 && ! isset( $server['host'] )
 						 && ( $lagged_status !== DB_LAG_OK )
-						 && ( $lagged_status = $this->get_lag() ) === DB_LAG_BEHIND && ! (
+						 && ( $lagged_status = $this->get_lag() ) === DB_LAG_BEHIND
+						 && ! (
 							! isset( $unique_lagged_slaves[ $host_and_port ] )
 							&& ( $this->unique_servers == ( count( $unique_lagged_slaves ) + 1 ) )
 							&& ( $group == $min_group )
@@ -868,6 +899,33 @@ class LudicrousDB extends wpdb {
 		}
 
 		return $this->dbhs[ $dbhname ];
+	}
+
+	/**
+	 * Increment a database connection counter.
+	 *
+	 * @since 5.2.0
+	 * @param int    $connection Connection index.
+	 * @param string $name       Connection name.
+	 */
+	protected function increment_db_connection( $connection = 0, $name = '' ) {
+
+		// Bail if name is empty
+		if ( empty( $name ) ) {
+			return;
+		}
+
+		// Initialize the connection counter
+		if ( ! isset( $this->db_connections[ $connection ] ) ) {
+			$this->db_connections[ $connection ] = array();
+		}
+
+		// Increment the connection counter
+		if ( ! isset( $this->db_connections[ $connection ][ $name ] ) ) {
+			$this->db_connections[ $connection ][ $name ] = 1;
+		} else {
+			++ $this->db_connections[ $connection ][ $name ];
+		}
 	}
 
 	/**
