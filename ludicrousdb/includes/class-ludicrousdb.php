@@ -911,7 +911,7 @@ class LudicrousDB extends wpdb {
 
 		while ( ( false === $this->persistent ) && count( $this->open_connections ) > $this->max_connections ) { // phpcs:ignore Squiz.PHP.DisallowSizeFunctionsInLoops.Found
 			$oldest_connection = array_shift( $this->open_connections );
-			if ( $this->dbhs[ $oldest_connection ] != $this->dbhs[ $dbhname ] ) {
+			if ( $this->dbhs[ $oldest_connection ] !== $this->dbhs[ $dbhname ] ) {
 				$this->disconnect( $oldest_connection );
 			}
 		}
