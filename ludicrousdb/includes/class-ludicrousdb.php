@@ -1132,17 +1132,17 @@ class LudicrousDB extends wpdb {
 	 * See set_charset().
 	 *
 	 * @since 1.0.0
-	 * @param string $string String to escape.
+	 * @param string $to_escape String to escape.
 	 */
-	public function _real_escape( $string ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
+	public function _real_escape( $to_escape = '' ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
 
 		// Bail if not a scalar
-		if ( ! is_scalar( $string ) ) {
+		if ( ! is_scalar( $to_escape ) ) {
 			return '';
 		}
 
 		// Slash the query part
-		$escaped = addslashes( $string );
+		$escaped = addslashes( $to_escape );
 
 		// Maybe use WordPress core placeholder method
 		if ( method_exists( $this, 'add_placeholder_escape' ) ) {
