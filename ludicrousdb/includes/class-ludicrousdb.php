@@ -1303,6 +1303,7 @@ class LudicrousDB extends wpdb {
 	 * Basic query. See documentation for more details.
 	 *
 	 * @since 1.0.0
+	 * @since 5.2.0 Added support for SELECT modifiers (e.g. DISTINCT, HIGH_PRIORITY, etc...)
 	 *
 	 * @param string $query Query.
 	 *
@@ -1410,7 +1411,7 @@ class LudicrousDB extends wpdb {
 
 			++ $this->num_queries;
 
-			if ( preg_match( '/^\s*SELECT\s+SQL_CALC_FOUND_ROWS\s/i', $query ) ) {
+			if ( preg_match( '/^\s*SELECT\s+([A-Z_]+\s+)*SQL_CALC_FOUND_ROWS\s/i', $query ) ) {
 				if ( false === strpos( $query, 'NO_SELECT_FOUND_ROWS' ) ) {
 					$this->timer_start();
 					$this->last_found_rows_result = $this->_do_query( 'SELECT FOUND_ROWS()', $this->dbh );
