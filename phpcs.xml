@@ -14,7 +14,6 @@
     <exclude name="Squiz.Commenting.FileComment" />
     <exclude name="Squiz.PHP.CommentedOutCode.Found" />
     <exclude name="Squiz.PHP.DisallowMultipleAssignments" />
-    <exclude name="WordPress.CodeAnalysis.AssignmentInCondition" />
     <exclude name="WordPress.DB.RestrictedFunctions" />
     <exclude name="WordPress.PHP.DontExtract.extract_extract" />
     <exclude name="WordPress.PHP.DevelopmentFunctions.error_log_wp_debug_backtrace_summary" />
@@ -35,7 +34,6 @@
 			<property name="text_domain" type="array">
 				<element value="ludicrousdb" />
 			</property>
-			<property name="check_translator_comments" value="true" />
 		</properties>
 	</rule>
 	<rule ref="PHPCompatibilityWP">

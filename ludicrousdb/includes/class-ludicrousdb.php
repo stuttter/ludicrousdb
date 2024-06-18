@@ -261,7 +261,7 @@ class LudicrousDB extends wpdb {
 		if ( is_array( $dbuser ) ) {
 			$class_vars = $dbuser;
 
-		// WPDB style parameter pattern
+			// WPDB style parameter pattern
 		} elseif ( is_string( $dbuser ) ) {
 
 			// Only compact if all params are not empty
@@ -496,7 +496,7 @@ class LudicrousDB extends wpdb {
 			$dataset               = $this->ludicrous_tables[ $this->table ];
 			$this->callback_result = null;
 
-		// Run callbacks and either extract or update dataset
+			// Run callbacks and either extract or update dataset
 		} else {
 
 			// Run callbacks and get result
@@ -546,7 +546,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Determine whether the query must be sent to the master (a writable server)
-		if ( ! empty( $use_master ) || ( $this->srtm === true ) || isset( $this->srtm[ $this->table ] ) ) { // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
+		if ( ! empty( $use_master ) || ( true === $this->srtm ) || isset( $this->srtm[ $this->table ] ) ) { // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
 			$use_master = true;
 		} elseif ( $this->is_write_query( $query ) ) {
 			$use_master = true;
@@ -615,7 +615,7 @@ class LudicrousDB extends wpdb {
 					$this->used_servers[ $dbhname ]['name'] = $name;
 				}
 
-			// Otherwise, use the name from the last connection
+				// Otherwise, use the name from the last connection
 			} else {
 				$name = $this->used_servers[ $dbhname ]['name'];
 			}
@@ -684,7 +684,7 @@ class LudicrousDB extends wpdb {
 			$success              = false;
 
 			foreach ( $servers as $group_key ) {
-				-- $tries_remaining;
+				--$tries_remaining;
 
 				// If all servers are lagged, we need to start ignoring the lag and retry
 				if ( count( $unique_lagged_slaves ) == $this->unique_servers ) {
@@ -716,7 +716,7 @@ class LudicrousDB extends wpdb {
 				if ( ! empty( $server ) && is_array( $server ) ) {
 					extract( $server, EXTR_OVERWRITE );
 
-				// Otherwise, set $server to an empty array
+					// Otherwise, set $server to an empty array
 				} else {
 					$server = array();
 				}
@@ -809,7 +809,7 @@ class LudicrousDB extends wpdb {
 							$this->dbh2host[ $dbhname ] = $host_and_port;
 
 							// Define these to avoid undefined variable notices
-							$queries = isset( $queries   ) ? $queries : 1; // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
+							$queries = isset( $queries ) ? $queries : 1; // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
 							$lag     = isset( $this->lag ) ? $this->lag : 0;
 
 							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
@@ -924,7 +924,7 @@ class LudicrousDB extends wpdb {
 		if ( ! isset( $this->db_connections[ $connection ][ $name ] ) ) {
 			$this->db_connections[ $connection ][ $name ] = 1;
 		} else {
-			++ $this->db_connections[ $connection ][ $name ];
+			++$this->db_connections[ $connection ][ $name ];
 		}
 	}
 
@@ -1098,7 +1098,7 @@ class LudicrousDB extends wpdb {
 
 		$num_fields = mysqli_num_fields( $this->result );
 
-		for ( $i = 0; $i < $num_fields; $i ++ ) {
+		for ( $i = 0; $i < $num_fields; $i++ ) {
 			$this->col_info[ $i ] = mysqli_fetch_field( $this->result );
 		}
 	}
@@ -1249,7 +1249,7 @@ class LudicrousDB extends wpdb {
 			error_reporting( $error_reporting & ~E_WARNING );
 		}
 
-		for ( $tries = 1; $tries <= $this->reconnect_retries; $tries ++ ) {
+		for ( $tries = 1; $tries <= $this->reconnect_retries; $tries++ ) {
 
 			// On the last try, re-enable warnings. We want to see a single instance of the
 			// "unable to connect" message on the bail() screen, if it appears.
@@ -1409,14 +1409,14 @@ class LudicrousDB extends wpdb {
 			$this->result = $this->_do_query( $query, $this->dbh );
 			$elapsed      = $this->timer_stop();
 
-			++ $this->num_queries;
+			++$this->num_queries;
 
 			if ( preg_match( '/^\s*SELECT\s+([A-Z_]+\s+)*SQL_CALC_FOUND_ROWS\s/i', $query ) ) {
 				if ( false === strpos( $query, 'NO_SELECT_FOUND_ROWS' ) ) {
 					$this->timer_start();
 					$this->last_found_rows_result = $this->_do_query( 'SELECT FOUND_ROWS()', $this->dbh );
 					$elapsed                     += $this->timer_stop();
-					++ $this->num_queries;
+					++$this->num_queries;
 					$query .= '; SELECT FOUND_ROWS()';
 				}
 			} else {
@@ -1468,7 +1468,7 @@ class LudicrousDB extends wpdb {
 
 				while ( $row = mysqli_fetch_object( $this->result ) ) {
 					$this->last_result[ $num_rows ] = $row;
-					$num_rows ++;
+					$num_rows++;
 				}
 			}
 
@@ -1505,8 +1505,9 @@ class LudicrousDB extends wpdb {
 	 * @access protected
 	 * @see wpdb::query()
 	 *
-	 * @param string $query The query to run.
-	 * @param bool   $dbh_or_table  Database or table name. Defaults to false.
+	 * @param  string $query The query to run.
+	 * @param  bool   $dbh_or_table  Database or table name. Defaults to false.
+	 * @throws Throwable If the query fails.
 	 */
 	protected function _do_query( $query, $dbh_or_table = false ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
 		$dbh = $this->get_db_object( $dbh_or_table );
@@ -1647,7 +1648,7 @@ class LudicrousDB extends wpdb {
 		) {
 			// Strip the '5.5.5-' prefix and set the version to the correct value.
 			$db_server_info = preg_replace( '/^5\.5\.5-(.*)/', '$1', $db_server_info );
-			$db_version     = preg_replace( '/[^0-9.].*/',     '',   $db_server_info );
+			$db_version     = preg_replace( '/[^0-9.].*/', '', $db_server_info );
 		}
 
 		switch ( strtolower( $db_cap ) ) {
@@ -1763,11 +1764,11 @@ class LudicrousDB extends wpdb {
 		if ( $this->dbh_type_check( $dbh_or_table ) ) {
 			$dbh = &$dbh_or_table;
 
-		// Database
+			// Database
 		} elseif ( ( false === $dbh_or_table ) && $this->dbh_type_check( $this->dbh ) ) {
 			$dbh = &$this->dbh;
 
-		// Table name
+			// Table name
 		} elseif ( is_string( $dbh_or_table ) ) {
 			$dbh = $this->db_connect( "SELECT FROM {$dbh_or_table} {$this->users}" );
 		}
@@ -2206,7 +2207,7 @@ class LudicrousDB extends wpdb {
 		if ( $this->tcp_is_cache_persistent() ) {
 			return wp_cache_get( $key, $this->cache_group );
 
-		// Fallback to local cache
+			// Fallback to local cache
 		} elseif ( ! empty( $this->tcp_cache[ $key ] ) ) {
 
 			// Not expired
@@ -2217,7 +2218,7 @@ class LudicrousDB extends wpdb {
 					? $this->tcp_cache[ $key ]['value']
 					: false;
 
-			// Expired, so delete and proceed
+				// Expired, so delete and proceed
 			} else {
 				$this->tcp_cache_delete( $key );
 			}
@@ -2252,11 +2253,11 @@ class LudicrousDB extends wpdb {
 		if ( $this->tcp_is_cache_persistent() ) {
 			return wp_cache_set( $key, $value, $this->cache_group, $expires );
 
-		// Fallback to local cache
+			// Fallback to local cache
 		} else {
 			$this->tcp_cache[ $key ] = array(
 				'value'      => $value,
-				'expiration' => time() + $expires
+				'expiration' => time() + $expires,
 			);
 		}
 
@@ -2285,7 +2286,7 @@ class LudicrousDB extends wpdb {
 		if ( $this->tcp_is_cache_persistent() ) {
 			return wp_cache_delete( $key, $this->cache_group );
 
-		// Fallback to local cache
+			// Fallback to local cache
 		} else {
 			unset( $this->tcp_cache[ $key ] );
 		}
