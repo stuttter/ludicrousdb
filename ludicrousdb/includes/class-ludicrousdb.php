@@ -961,12 +961,10 @@ class LudicrousDB extends wpdb {
 	protected function single_db_connect( $dbhname, $host, $user, $password ) {
 		$this->is_mysql = true;
 
-		/*
-		 * Deprecated in 3.9+ when using MySQLi. No equivalent
-		 * $new_link parameter exists for mysqli_* functions.
-		 */
-		$new_link     = defined( 'MYSQL_NEW_LINK' ) ? MYSQL_NEW_LINK : true;
-		$client_flags = defined( 'MYSQL_CLIENT_FLAGS' ) ? MYSQL_CLIENT_FLAGS : 0;
+		// Check client flags
+		$client_flags = defined( 'MYSQL_CLIENT_FLAGS' )
+			? MYSQL_CLIENT_FLAGS
+			: 0;
 
 		$this->dbhs[ $dbhname ] = mysqli_init();
 
