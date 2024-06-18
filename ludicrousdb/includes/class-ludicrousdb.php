@@ -352,7 +352,7 @@ class LudicrousDB extends wpdb {
 		);
 
 		// Merge using defaults
-		$db      = array_merge( $database_defaults, $db );
+		$db = array_merge( $database_defaults, $db );
 
 		// Break these apart to make code easier to understand below
 		$dataset = $db['dataset'];
@@ -876,9 +876,12 @@ class LudicrousDB extends wpdb {
 				$this->print_error( $msg );
 			}
 
-			if ( empty( $success )
-				 || ! isset( $this->dbhs[ $dbhname ] )
-				 || ! $this->dbh_type_check( $this->dbhs[ $dbhname ] )
+			if (
+				empty( $success )
+				||
+				! isset( $this->dbhs[ $dbhname ] )
+				||
+				! $this->dbh_type_check( $this->dbhs[ $dbhname ] )
 			) {
 
 				// Lagged slaves were not used. Ignore the lag for this connection attempt and retry.
