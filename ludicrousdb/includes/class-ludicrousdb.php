@@ -22,7 +22,7 @@ class LudicrousDB extends wpdb {
 	/**
 	 * The last table that was queried
 	 *
-	 * @var string
+	 * @var string Default empty string.
 	 */
 	public $last_table = '';
 
@@ -33,21 +33,21 @@ class LudicrousDB extends wpdb {
 	 * intervening queries from making FOUND_ROWS() inaccessible. You may
 	 * prevent this by adding "NO_SELECT_FOUND_ROWS" in a comment
 	 *
-	 * @var resource
+	 * @var resource Default null.
 	 */
 	public $last_found_rows_result = null;
 
 	/**
 	 * Whether to store queries in an array. Useful for debugging and profiling
 	 *
-	 * @var bool
+	 * @var bool Default false.
 	 */
 	public $save_queries = false;
 
 	/**
 	 * The current MySQL link resource
 	 *
-	 * @var mysqli|resource|false|null
+	 * @var mysqli|resource|false|null Default null.
 	 */
 	public $dbh;
 
@@ -61,42 +61,42 @@ class LudicrousDB extends wpdb {
 	/**
 	 * The multi-dimensional array of datasets and servers
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	public $ludicrous_servers = array();
 
 	/**
 	 * Optional directory of tables and their datasets
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	public $ludicrous_tables = array();
 
 	/**
 	 * Optional directory of callbacks to determine datasets from queries
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	public $ludicrous_callbacks = array();
 
 	/**
 	 * Custom callback to save debug info in $this->queries
 	 *
-	 * @var callable
+	 * @var callable Default null.
 	 */
 	public $save_query_callback = null;
 
 	/**
 	 * Whether to use mysql_pconnect instead of mysql_connect
 	 *
-	 * @var bool
+	 * @var bool Default false.
 	 */
 	public $persistent = false;
 
 	/**
 	 * Allow bail if connection fails
 	 *
-	 * @var bool
+	 * @var bool Default false.
 	 */
 	public $allow_bail = false;
 
@@ -104,35 +104,35 @@ class LudicrousDB extends wpdb {
 	 * The maximum number of db links to keep open. The least-recently used
 	 * link will be closed when the number of links exceeds this
 	 *
-	 * @var int
+	 * @var int Default 10.
 	 */
 	public $max_connections = 10;
 
 	/**
 	 * Whether to check with fsockopen prior to mysql_connect
 	 *
-	 * @var bool
+	 * @var bool Default true.
 	 */
 	public $check_tcp_responsiveness = true;
 
 	/**
 	 * The amount of time to wait before trying again to ping mysql server.
 	 *
-	 * @var float
+	 * @var float Default 0.1.
 	 */
 	public $recheck_timeout = 0.1;
 
 	/**
 	 * Whether to check for heartbeats
 	 *
-	 * @var bool
+	 * @var bool Default true.
 	 */
 	public $check_dbh_heartbeats = true;
 
 	/**
 	 * Keeps track of the dbhname usage and errors.
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	public $dbhname_heartbeats = array();
 
@@ -141,7 +141,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @access protected
 	 * @see wpdb::check_connection()
-	 * @var int
+	 * @var int Default 3.
 	 */
 	protected $reconnect_retries = 3;
 
@@ -149,35 +149,35 @@ class LudicrousDB extends wpdb {
 	 * Send Reads To Masters. This disables slave connections while true.
 	 * Otherwise it is an array of written tables
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	public $srtm = array();
 
 	/**
 	 * The log of db connections made and the time each one took
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	public $db_connections = array();
 
 	/**
 	 * The list of unclosed connections sorted by LRU
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	public $open_connections = array();
 
 	/**
 	 * Lookup array (dbhname => host:port)
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	public $dbh2host = array();
 
 	/**
 	 * The last server used and the database name selected
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	public $last_used_server = array();
 
@@ -185,7 +185,7 @@ class LudicrousDB extends wpdb {
 	 * Lookup array (dbhname => (server, db name) ) for re-selecting the db
 	 * when a link is re-used
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	public $used_servers = array();
 
@@ -193,42 +193,42 @@ class LudicrousDB extends wpdb {
 	 * Whether to save debug_backtrace in save_query_callback. You may wish
 	 * to disable this, e.g. when tracing out-of-memory problems.
 	 *
-	 * @var bool
+	 * @var bool Default true.
 	 */
 	public $save_backtrace = true;
 
 	/**
 	 * Maximum lag in seconds. Set null to disable. Requires callbacks
 	 *
-	 * @var integer
+	 * @var integer Default null.
 	 */
 	public $default_lag_threshold = null;
 
 	/**
 	 * In memory cache for tcp connected status.
 	 *
-	 * @var array
+	 * @var array Default empty array.
 	 */
 	private $tcp_cache = array();
 
 	/**
 	 * Name of object cache group.
 	 *
-	 * @var string
+	 * @var string Default 'ludicrousdb'.
 	 */
 	public $cache_group = 'ludicrousdb';
 
 	/**
 	 * Whether to ignore slave lag.
 	 *
-	 * @var bool
+	 * @var bool Default false.
 	 */
 	private $ignore_slave_lag = false;
 
 	/**
 	 * Number of unique servers.
 	 *
-	 * @var int
+	 * @var null|int Default null. Might be zero or more.
 	 */
 	private $unique_servers = null;
 
@@ -687,7 +687,7 @@ class LudicrousDB extends wpdb {
 				--$tries_remaining;
 
 				// If all servers are lagged, we need to start ignoring the lag and retry
-				if ( count( $unique_lagged_slaves ) == $this->unique_servers ) {
+				if ( count( $unique_lagged_slaves ) === (int) $this->unique_servers ) {
 					break;
 				}
 
@@ -750,10 +750,22 @@ class LudicrousDB extends wpdb {
 					: $this->default_lag_threshold;
 
 				// Check for a lagged slave, if applicable
-				if ( empty( $use_master ) && empty( $write ) && empty( $this->ignore_slave_lag ) && isset( $this->lag_threshold ) && ! isset( $server['host'] ) && ( $lagged_status = $this->get_lag_cache() ) === DB_LAG_BEHIND ) {
+				if (
+					empty( $use_master )
+					&&
+					empty( $write )
+					&&
+					empty( $this->ignore_slave_lag )
+					&&
+					isset( $this->lag_threshold )
+					&&
+					! isset( $server['host'] )
+					&&
+					( $lagged_status = $this->get_lag_cache() ) === DB_LAG_BEHIND // phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition
+				) {
 
 					// If it is the last lagged slave and it is with the best preference we will ignore its lag
-					if ( ! isset( $unique_lagged_slaves[ $host_and_port ] ) && $this->unique_servers == count( $unique_lagged_slaves ) + 1 && $group == $min_group ) {
+					if ( ! isset( $unique_lagged_slaves[ $host_and_port ] ) && ( (int) $this->unique_servers === count( $unique_lagged_slaves ) + 1 ) && $group == $min_group ) {
 						$this->lag_threshold = null;
 					} else {
 						$unique_lagged_slaves[ $host_and_port ] = $this->lag;
@@ -791,7 +803,7 @@ class LudicrousDB extends wpdb {
 						 && ( $lagged_status = $this->get_lag() ) === DB_LAG_BEHIND
 						 && ! (
 							! isset( $unique_lagged_slaves[ $host_and_port ] )
-							&& ( $this->unique_servers == ( count( $unique_lagged_slaves ) + 1 ) )
+							&& ( (int) $this->unique_servers === ( count( $unique_lagged_slaves ) + 1 ) )
 							&& ( $group == $min_group )
 						)
 					) {
