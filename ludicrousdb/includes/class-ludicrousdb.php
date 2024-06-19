@@ -1485,7 +1485,7 @@ class LudicrousDB extends wpdb {
 			if ( $this->result instanceof mysqli_result ) {
 				$this->load_col_info();
 
-				while ( $row = mysqli_fetch_object( $this->result ) ) {
+				while ( $row = mysqli_fetch_object( $this->result ) ) { // phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition
 					$this->last_result[ $num_rows ] = $row;
 					$num_rows++;
 				}
@@ -2129,13 +2129,13 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $string String to convert
+	 * @param string $to_strip String to convert
 	 * @param string $charset Character set to test against (uses MySQL character set names)
 	 *
 	 * @return mixed The converted string, or a WP_Error if the conversion fails
 	 */
-	protected function strip_invalid_text_using_db( $string, $charset ) {
-		$query  = $this->prepare( "SELECT CONVERT( %s USING {$charset} )", $string );
+	protected function strip_invalid_text_using_db( $to_strip, $charset ) {
+		$query  = $this->prepare( "SELECT CONVERT( %s USING {$charset} )", $to_strip );
 		$result = $this->_do_query( $query, $this->dbh );
 
 		// Bail with error if no result
