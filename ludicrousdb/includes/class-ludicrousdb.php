@@ -241,6 +241,18 @@ class LudicrousDB extends wpdb {
 	private $callback_result = null;
 
 	/**
+	 * Array of renamed class variables.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @var array Default key-value array of old and new class variables.
+	 */
+	private static $renamed_vars = array(
+		'ignore_slave_lag' => 'ignore_replica_lag',
+		'srtm'             => 'send_reads_to_primaries',
+	);
+
+	/**
 	 * Gets ready to make database connections
 	 *
 	 * @since 1.0.0
@@ -285,6 +297,42 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
+	 * Magic method to correctly get renamed attributes.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param  string $name The key to set.
+	 * @return mixed
+	 */
+	public function __get( $name ) {
+
+		// Check if old var is in $class_vars_renamed
+		if ( isset( $this->renamed_vars[ $name ] ) ) {
+			$name = $this->renamed_vars[ $name ];
+		}
+
+		return parent::__get( $name );
+	}
+
+	/**
+	 * Magic method to correctly set renamed attributes.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param string $name  The key to set.
+	 * @param mixed  $value The value to set.
+	 */
+	public function __set( $name, $value ) {
+
+		// Check if old var is in $class_vars_renamed
+		if ( isset( $this->renamed_vars[ $name ] ) ) {
+			$name = $this->renamed_vars[ $name ];
+		}
+
+		parent::__set( $name, $value );
+	}
+
+	/**
 	 * Sets class vars from an array of arguments.
 	 *
 	 * @since 5.2.0
@@ -301,22 +349,16 @@ class LudicrousDB extends wpdb {
 		$class_vars     = get_class_vars( __CLASS__ );
 		$class_var_keys = array_keys( $class_vars );
 
-		// Array of renamed class vars - key is new name, value is old name
-		$class_vars_renamed = array(
-			'ignore_replica_lag'      => 'ignore_slave_lag',
-			'send_reads_to_primaries' => 'srtm',
-		);
-
 		// Loop through class vars and override if set in $args
 		foreach ( $class_var_keys as $var ) {
 
 			// Check if old var is in $args
 			if (
-				isset( $class_vars_renamed[ $var ] )
+				isset( $this->renamed_vars[ $var ] )
 				&&
-				isset( $args[ $class_vars_renamed[ $var ] ] )
+				isset( $args[ $this->renamed_vars[ $var ] ] )
 			) {
-				$this->{$var} = $args[ $class_vars_renamed[ $var ] ];
+				$this->{$var} = $args[ $this->renamed_vars[ $var ] ];
 			}
 
 			// Check if current var is in $args
