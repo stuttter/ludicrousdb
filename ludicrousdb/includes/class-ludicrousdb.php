@@ -1487,6 +1487,8 @@ class LudicrousDB extends wpdb {
 
 				while ( $row = mysqli_fetch_object( $this->result ) ) { // phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition
 					$this->last_result[ $num_rows ] = $row;
+
+					// phpcs:ignore
 					$num_rows++;
 				}
 			}
@@ -1905,9 +1907,11 @@ class LudicrousDB extends wpdb {
 		$errstr = '';
 
 		// Try to get a new socket
+		// phpcs:disable
 		$socket = ( WP_DEBUG )
 			? fsockopen( $host, $port, $errno, $errstr, $float_timeout )
-			: @fsockopen( $host, $port, $errno, $errstr, $float_timeout ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			: @fsockopen( $host, $port, $errno, $errstr, $float_timeout );
+		// phpcs:enable
 
 		// No socket
 		if ( false === $socket ) {
@@ -1917,6 +1921,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Close the socket
+		// phpcs:ignore
 		fclose( $socket );
 
 		// Using API
@@ -2159,7 +2164,7 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Get the cache key used for TCP responses
 	 *
-	 * @since 3.0.0
+	 * since 3.0.0
 	 *
 	 * @param string $host Host
 	 * @param string $port Port or socket.
