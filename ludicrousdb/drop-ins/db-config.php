@@ -100,7 +100,7 @@ $wpdb->add_database(
 );
 
 /**
- * This adds the same server again, only this time it is configured as a slave.
+ * This adds the same server again, only this time it is configured as a replica.
  * The last three parameters are set to the defaults but are shown for clarity.
  */
 $wpdb->add_database(

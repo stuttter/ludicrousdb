@@ -64,8 +64,8 @@ function ldb_add_db_table( $dataset, $table ) {
  * @param  string $dataset  Dataset:          The name of the dataset. Just use "global" if you don't need horizontal partitioning.
  * @param  int    $part     Partition:        The vertical partition number (1, 2, 3, etc.). Use "0" if you don't need vertical partitioning.
  * @param  string $dc       Datacenter:       Where the database server is located. Airport codes are convenient. Use whatever.
- * @param  int    $read     Read group:       Tries all servers in lowest number group before trying higher number group. Typical: 1 for slaves, 2 for master. This will cause reads to go to slaves.
- * @param  bool   $write    Write flag:       Is this server writable? Works the same as $read. Typical: 1 for master, 0 for slaves.
+ * @param  int    $read     Read group:       Tries all servers in lowest number group before trying higher number group. Typical: 1 for replicas, 2 for primary. This will cause reads to go to replicas.
+ * @param  bool   $write    Write flag:       Is this server writable? Works the same as $read. Typical: 1 for primary, 0 for replicas.
  * @param  string $host     Internet address: host:port of server on Internet.
  * @param  string $lhost    Local address:    host:port of server for use when in same datacenter. Leave empty if no local address exists.
  * @param  string $name     Database name.
