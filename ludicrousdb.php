@@ -1,15 +1,17 @@
 <?php
 
 /**
- * Plugin Name: LudicrousDB
- * Plugin URI:  https://github.com/stuttter/ludicrousdb
- * Author:      JJJ & Friends
- * Author URI:  https://github.com/stuttter/ludicrousdb/graphs/contributors
- * License:     GPL v2 or later
- * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: ludicrousdb
- * Version:     5.0.0
- * Description: An advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
+ * Plugin Name:       LudicrousDB
+ * Description:       An advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning.
+ * Author:            Triple J Software, Inc.
+ * License:           GPL v2 or later
+ * Plugin URI:        https://github.com/stuttter/ludicrousdb
+ * Author URI:        https://jjj.software
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       ludicrousdb
+ * Requires PHP:      7.4
+ * Requires at least: 5.0
+ * Version:           5.2.0
  */
 
 // Exit if accessed directly
@@ -34,14 +36,15 @@ if ( isset( $GLOBALS['wpdb'] ) ) {
 }
 
 // Required files
-require_once dirname( __FILE__ ) . '/ludicrousdb/includes/functions.php';
-require_once dirname( __FILE__ ) . '/ludicrousdb/includes/class-ludicrousdb.php';
+require_once __DIR__ . '/ludicrousdb/includes/functions.php';
+require_once __DIR__ . '/ludicrousdb/includes/class-ludicrousdb.php';
 
 // Set default constants
 ldb_default_constants();
 
 // Create database object
-$wpdb = new LudicrousDB(); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+// phpcs:ignore
+$wpdb = new LudicrousDB();
 
 // Include LudicrousDB config file if found or set
 if ( defined( 'DB_CONFIG_FILE' ) && file_exists( DB_CONFIG_FILE ) ) {

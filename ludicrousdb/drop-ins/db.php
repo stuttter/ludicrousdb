@@ -1,15 +1,17 @@
 <?php
 
 /**
- * Plugin Name: LudicrousDB (Database)
- * Plugin URI:  https://github.com/stuttter/ludicrousdb
- * Author:      JJJ & Friends
- * Author URI:  https://github.com/stuttter/ludicrousdb/graphs/contributors
- * License:     GPL v2 or later
- * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: ludicrousdb
- * Version:     5.0.0
- * Description: An advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
+ * Plugin Name:       LudicrousDB (Database)
+ * Description:       An advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning.
+ * Author:            Triple J Software, Inc.
+ * License:           GPL v2 or later
+ * Plugin URI:        https://github.com/stuttter/ludicrousdb
+ * Author URI:        https://github.com/stuttter/ludicrousdb/graphs/contributors
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       ludicrousdb
+ * Requires PHP:      7.4
+ * Requires at least: 5.0
+ * Version:           5.2.0
  */
 
 /**
@@ -24,10 +26,10 @@
 defined( 'ABSPATH' ) || exit;
 
 // Custom directory name
-$ldb_dirname = defined( 'LDB_DIRNAME'     ) ? LDB_DIRNAME : 'ludicrousdb';
+$ldb_dirname = defined( 'LDB_DIRNAME' ) ? LDB_DIRNAME : 'ludicrousdb';
 
 // Supported plugin directories
-$wp_plugin_dir   = defined( 'WP_PLUGIN_DIR'   ) ? WP_PLUGIN_DIR : WP_CONTENT_DIR . '/plugins';
+$wp_plugin_dir   = defined( 'WP_PLUGIN_DIR' ) ? WP_PLUGIN_DIR : WP_CONTENT_DIR . '/plugins';
 $wpmu_plugin_dir = defined( 'WPMU_PLUGIN_DIR' ) ? WPMU_PLUGIN_DIR : WP_CONTENT_DIR . '/mu-plugins';
 $wpdb_plugin_dir = defined( 'WPDB_PLUGIN_DIR' ) ? WPDB_PLUGIN_DIR : WP_CONTENT_DIR . '/db-plugins';
 

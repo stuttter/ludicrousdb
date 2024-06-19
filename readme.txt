@@ -1,18 +1,21 @@
 === LudicrousDB ===
-Contributors: johnjamesjacoby, spacedmonkey
-Tags: mysql, scaling, performance, availability, replication
-Requires at least: 4.8
-Tested up to: 5.3
-Stable tag: 5.0.0
-License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
-Donate link: https://wordpressfoundation.org/donate
+Contributors:      johnjamesjacoby, spacedmonkey
+Author:            Triple J Software, Inc.
+Author URI:        https://jjj.software
+Plugin URI:        https://github.com/stuttter/ludicrousdb/
+License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+License:           GPLv2 or later
+Tags:              database, mysql, performance, scaling, wpdb
+Requires PHP:      7.0
+Requires at least: 5.0
+Tested up to:      6.5
+Stable tag:        5.2.0
 
 LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
 
 == Description ==
 
-LudicrousDB is an advanced database interface for WordPress that replaces much of WordPress's built-in database functionality.
+LudicrousDB is an advanced database interface for WordPress that replaces much of its built-in database functionality.
 
 The main differences are:
 
@@ -27,7 +30,7 @@ It supports:
 * Local and remote data-centers
 * Private and public networks
 * Different tables on different databases/hosts
-* Smart post-write master reads
+* Smart post-write primary reads
 * Fail-over for downed host
 * Advanced statistics for profiling
 
@@ -41,7 +44,7 @@ HyperDB's original contributors: matt, andy, ryan, mdawaffe, vnsavage, automatti
 
 == Installation ==
 
-See https://github.com/stuttter/ludicrousdb/blob/master/README.md#installation
+See https://github.com/stuttter/ludicrousdb/wiki/0.-Installation
 
 == Frequently Asked Questions ==
 
@@ -53,7 +56,7 @@ Stretch your imagination. You could create a dynamic configuration using persist
 
 = How does LudicrousDB support replication? =
 
-LudicrousDB does not provide replication services. That is done by configuring MySQL servers for replication. LudicrousDB can then be configured to use these servers appropriately, e.g. by connecting to master servers to perform write queries.
+LudicrousDB does not provide replication services. That is done by configuring MySQL servers for replication. LudicrousDB can then be configured to use these servers appropriately, e.g. by connecting to primary servers to perform write queries.
 
 = How does LudicrousDB support load balancing? =
 
@@ -79,6 +82,11 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 
 == Changelog ==
 
+= 5.2.0 =
+* PHP 8.3 compatibility
+* Update default collation to utf8mb4_unicode_520_ci
+* Fix a few PHP warnings under some configurations
+
 = 5.0.0 =
 * PHP 7.3 compatibility
 * Update default collation to unicode_520_ci
@@ -91,10 +99,10 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 
 = 4.0.0 =
 * Support for custom mu / plugin paths
-* Improved WordPress 4.6 capability 
+* Improved WordPress 4.6 capability
 * New filter - pre_query
 * New action - queried
-* Allow db-config.php file to stored in wp-content directory. 
+* Allow db-config.php file to stored in wp-content directory.
 
 = 3.0.0 =
 * Improved support for mu-plugins installation location
@@ -130,7 +138,7 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 * Removed delay between connection retries and avoid immediate retry of same server when others are available to try.
 * Added connection stats.
 * Added save_query_callback for custom debug logging.
-* Refined SRTM granularity. Now only send reads to masters when the written table is involved.
+* Refined SRTM granularity. Now only send reads to primaries when the written table is involved.
 * Improved connection reuse logic and added mysql_ping to recover from "server has gone away".
 * Added min_tries to configure the minimum number of connection attempts before bailing.
 * Added WPDB_PATH constant. Define this if you'd rather not use ABSPATH . WPINC . '/wp-db.php'.
