@@ -137,15 +137,6 @@ class LudicrousDB extends wpdb {
 	public $dbhname_heartbeats = array();
 
 	/**
-	 * The number of times to retry reconnecting before dying
-	 *
-	 * @access protected
-	 * @see wpdb::check_connection()
-	 * @var int Default 3.
-	 */
-	protected $reconnect_retries = 3;
-
-	/**
 	 * The tables that have been written to.
 	 *
 	 * Disables replica connections if explicitly true.
@@ -206,18 +197,18 @@ class LudicrousDB extends wpdb {
 	public $default_lag_threshold = null;
 
 	/**
-	 * In memory cache for tcp connected status.
+	 * Name of object TCP cache group.
+	 *
+	 * @var string Default 'ludicrousdb'.
+	 */
+	public $tcp_cache_group = 'ludicrousdb';
+
+	/**
+	 * In memory cache for TCP connected status.
 	 *
 	 * @var array Default empty array.
 	 */
 	private $tcp_cache = array();
-
-	/**
-	 * Name of object cache group.
-	 *
-	 * @var string Default 'ludicrousdb'.
-	 */
-	public $cache_group = 'ludicrousdb';
 
 	/**
 	 * Whether to ignore replica lag.
@@ -239,6 +230,15 @@ class LudicrousDB extends wpdb {
 	 * @var mixed Default null.
 	 */
 	private $callback_result = null;
+
+	/**
+	 * The number of times to retry reconnecting before dying
+	 *
+	 * @access protected
+	 * @see wpdb::check_connection()
+	 * @var int Default 3.
+	 */
+	protected $reconnect_retries = 3;
 
 	/**
 	 * Array of renamed class variables.
@@ -269,31 +269,11 @@ class LudicrousDB extends wpdb {
 			$this->show_errors();
 		}
 
-		// Bail if first method parameter is empty
-		if ( empty( $dbuser ) ) {
-			return;
-		}
+		// Start the TCP cache
+		$this->tcp_cache_start();
 
-		// Default class vars
-		$class_vars = array();
-
-		// Custom class vars via array of arguments
-		if ( is_array( $dbuser ) ) {
-			$class_vars = $dbuser;
-
-			// WPDB style parameter pattern
-		} elseif ( is_string( $dbuser ) ) {
-
-			// Only compact if all params are not empty
-			if ( ! empty( $dbpassword ) && ! empty( $dbname ) && ! empty( $dbhost ) ) {
-				$class_vars = compact( $dbuser, $dbpassword, $dbname, $dbhost );
-			}
-		}
-
-		// Only set vars if there are vars to set
-		if ( ! empty( $class_vars ) ) {
-			$this->set_class_vars( $class_vars );
-		}
+		// Prepare class vars
+		$this->prepare_class_vars( $dbuser, $dbpassword, $dbname, $dbhost );
 	}
 
 	/**
@@ -330,6 +310,45 @@ class LudicrousDB extends wpdb {
 		}
 
 		parent::__set( $name, $value );
+	}
+
+	/**
+	 * Prepare class vars from constructor.
+	 *
+	 * @since 5.2.0
+	 *
+	 * @param array|string $dbuser     New class variables, or Database user.
+	 * @param string       $dbpassword Database password.
+	 * @param string       $dbname     Database name.
+	 * @param string       $dbhost     Database host.
+	 */
+	protected function prepare_class_vars( $dbuser = '', $dbpassword = '', $dbname = '', $dbhost = '' ) {
+
+		// Bail if first method parameter is empty
+		if ( empty( $dbuser ) ) {
+			return;
+		}
+
+		// Default class vars
+		$class_vars = array();
+
+		// Custom class vars via array of arguments
+		if ( is_array( $dbuser ) ) {
+			$class_vars = $dbuser;
+
+			// WPDB style parameter pattern
+		} elseif ( is_string( $dbuser ) ) {
+
+			// Only compact if all params are not empty
+			if ( ! empty( $dbpassword ) && ! empty( $dbname ) && ! empty( $dbhost ) ) {
+				$class_vars = compact( $dbuser, $dbpassword, $dbname, $dbhost );
+			}
+		}
+
+		// Only set vars if there are vars to set
+		if ( ! empty( $class_vars ) ) {
+			$this->set_class_vars( $class_vars );
+		}
 	}
 
 	/**
@@ -522,11 +541,20 @@ class LudicrousDB extends wpdb {
 	 * @param string $group Group, key name in array.
 	 * @param array  $args   Args passed to callback. Default to null.
 	 */
-	public function run_callbacks( $group, $args = null ) {
-		if ( ! isset( $this->ludicrous_callbacks[ $group ] ) || ! is_array( $this->ludicrous_callbacks[ $group ] ) ) {
+	public function run_callbacks( $group = '', $args = null ) {
+
+		// Bail if no callbacks for group
+		if (
+			empty( $group )
+			||
+			! isset( $this->ludicrous_callbacks[ $group ] )
+			||
+			! is_array( $this->ludicrous_callbacks[ $group ] )
+		) {
 			return;
 		}
 
+		// Prepare args
 		if ( ! isset( $args ) ) {
 			$args = array( &$this );
 		} elseif ( is_array( $args ) ) {
@@ -535,8 +563,13 @@ class LudicrousDB extends wpdb {
 			$args = array( $args, &$this );
 		}
 
+		// Loop through callbacks
 		foreach ( $this->ludicrous_callbacks[ $group ] as $func ) {
+
+			// Run callback
 			$result = call_user_func_array( $func, $args );
+
+			// Return result if not null
 			if ( isset( $result ) ) {
 				return $result;
 			}
@@ -900,7 +933,13 @@ class LudicrousDB extends wpdb {
 					: null;
 
 				// Connect if necessary or possible
-				if ( ! empty( $use_primary ) || empty( $tries_remaining ) || ( true === $tcp ) ) {
+				if (
+					! empty( $use_primary )
+					||
+					empty( $tries_remaining )
+					||
+					( true === $tcp )
+				) {
 					$this->single_db_connect( $dbhname, $host_and_port, $user, $password );
 				} else {
 					$this->dbhs[ $dbhname ] = false;
@@ -2318,6 +2357,47 @@ class LudicrousDB extends wpdb {
 	/** TCP Cache *************************************************************/
 
 	/**
+	 * Start the TCP cache
+	 *
+	 * @since 5.2.0
+	 * @see https://github.com/stuttter/ludicrousdb/issues/126
+	 */
+	protected function tcp_cache_start() {
+		static $started = null;
+
+		// Bail if added or caching not available yet
+		if ( true === $started ) {
+			return;
+		}
+
+		// Maybe start object cache
+		if ( function_exists( 'wp_start_object_cache' ) ) {
+			wp_start_object_cache();
+
+			// Make sure the global group is added
+			$this->tcp_cache_add_global_group();
+		}
+
+		// Set started
+		$started = true;
+	}
+
+	/**
+	 * Add global TCP cache group.
+	 *
+	 * Only run once, as that is all that is required.
+	 *
+	 * @since 5.2.0
+	 */
+	protected function tcp_cache_add_global_group() {
+
+		// Add the cache group
+		if ( function_exists( 'wp_cache_add_global_groups' ) ) {
+			wp_cache_add_global_groups( $this->tcp_cache_group );
+		}
+	}
+
+	/**
 	 * Get the cache key used for TCP responses
 	 *
 	 * @since 3.0.0
@@ -2354,9 +2434,6 @@ class LudicrousDB extends wpdb {
 		// Check if using external object cache
 		if ( wp_using_ext_object_cache() ) {
 
-			// Make sure the global group is added
-			$this->add_global_group();
-
 			// Yes
 			return true;
 		}
@@ -2385,7 +2462,7 @@ class LudicrousDB extends wpdb {
 
 		// Get from persistent cache
 		if ( $this->tcp_is_cache_persistent() ) {
-			return wp_cache_get( $key, $this->cache_group );
+			return wp_cache_get( $key, $this->tcp_cache_group );
 
 			// Fallback to local cache
 		} elseif ( ! empty( $this->tcp_cache[ $key ] ) ) {
@@ -2431,7 +2508,7 @@ class LudicrousDB extends wpdb {
 
 		// Add to persistent cache
 		if ( $this->tcp_is_cache_persistent() ) {
-			return wp_cache_set( $key, $value, $this->cache_group, $expires );
+			return wp_cache_set( $key, $value, $this->tcp_cache_group, $expires );
 
 			// Fallback to local cache
 		} else {
@@ -2464,7 +2541,7 @@ class LudicrousDB extends wpdb {
 
 		// Delete from persistent cache
 		if ( $this->tcp_is_cache_persistent() ) {
-			return wp_cache_delete( $key, $this->cache_group );
+			return wp_cache_delete( $key, $this->tcp_cache_group );
 
 			// Fallback to local cache
 		} else {
@@ -2472,30 +2549,6 @@ class LudicrousDB extends wpdb {
 		}
 
 		return true;
-	}
-
-	/**
-	 * Add global cache group.
-	 *
-	 * Only run once, as that is all that is required.
-	 *
-	 * @since 4.3.0
-	 */
-	protected function add_global_group() {
-		static $added = null;
-
-		// Bail if added or caching not available yet
-		if ( true === $added ) {
-			return;
-		}
-
-		// Add the cache group
-		if ( function_exists( 'wp_cache_add_global_groups' ) ) {
-			wp_cache_add_global_groups( $this->cache_group );
-		}
-
-		// Set added
-		$added = true;
 	}
 
 	/**
