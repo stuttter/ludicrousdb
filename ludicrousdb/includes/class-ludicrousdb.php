@@ -2164,7 +2164,7 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Get the cache key used for TCP responses
 	 *
-	 * since 3.0.0
+	 * @since 3.0.0
 	 *
 	 * @param string $host Host
 	 * @param string $port Port or socket.
