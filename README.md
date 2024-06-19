@@ -221,9 +221,7 @@ The second callback is called after a connection to a replica is established. It
 
 ## Sample replication lag detection configuration
 
-To detect replication lag, try [mk-heartbeat](http://www.maatkit.org/doc/mk-heartbeat.html) or pt-heartbeat from Percona Toolkit. These tools insert a timestamp into a table on the master and then check the lag on the replicas. The lag is the difference between the current time and the timestamp on the replica. The lag is in seconds.
-
-```sql
+To detect replication lag, try [mk-heartbeat](http://www.maatkit.org/doc/mk-heartbeat.html) or pt-heartbeat from Percona Toolkit. These tools insert a timestamp into a table on the master and then check the lag on the replicas. The lag is the difference in seconds between the current time and the timestamp on the replica.
 
 This implementation requires the database user to have read access to the heartbeat table.
 
