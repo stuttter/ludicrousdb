@@ -307,8 +307,8 @@ class LudicrousDB extends wpdb {
 	public function __get( $name ) {
 
 		// Check if old var is in $class_vars_renamed
-		if ( isset( $this->renamed_vars[ $name ] ) ) {
-			$name = $this->renamed_vars[ $name ];
+		if ( isset( self::$renamed_vars[ $name ] ) ) {
+			$name = self::$renamed_vars[ $name ];
 		}
 
 		return parent::__get( $name );
@@ -325,8 +325,8 @@ class LudicrousDB extends wpdb {
 	public function __set( $name, $value ) {
 
 		// Check if old var is in $class_vars_renamed
-		if ( isset( $this->renamed_vars[ $name ] ) ) {
-			$name = $this->renamed_vars[ $name ];
+		if ( isset( self::$renamed_vars[ $name ] ) ) {
+			$name = self::$renamed_vars[ $name ];
 		}
 
 		parent::__set( $name, $value );
@@ -354,11 +354,11 @@ class LudicrousDB extends wpdb {
 
 			// Check if old var is in $args
 			if (
-				isset( $this->renamed_vars[ $var ] )
+				isset( self::$renamed_vars[ $var ] )
 				&&
-				isset( $args[ $this->renamed_vars[ $var ] ] )
+				isset( $args[ self::$renamed_vars[ $var ] ] )
 			) {
-				$this->{$var} = $args[ $this->renamed_vars[ $var ] ];
+				$this->{$var} = $args[ self::$renamed_vars[ $var ] ];
 			}
 
 			// Check if current var is in $args
