@@ -15,7 +15,7 @@ LudicrousDB is an advanced database interface for WordPress that supports replic
 
 == Description ==
 
-LudicrousDB is an advanced database interface for WordPress that replaces much of WordPress's built-in database functionality.
+LudicrousDB is an advanced database interface for WordPress that replaces much of its built-in database functionality.
 
 The main differences are:
 
@@ -30,7 +30,7 @@ It supports:
 * Local and remote data-centers
 * Private and public networks
 * Different tables on different databases/hosts
-* Smart post-write master reads
+* Smart post-write primary reads
 * Fail-over for downed host
 * Advanced statistics for profiling
 
@@ -44,7 +44,7 @@ HyperDB's original contributors: matt, andy, ryan, mdawaffe, vnsavage, automatti
 
 == Installation ==
 
-See https://github.com/stuttter/ludicrousdb/blob/master/README.md#installation
+See https://github.com/stuttter/ludicrousdb/wiki/0.-Installation
 
 == Frequently Asked Questions ==
 
@@ -56,7 +56,7 @@ Stretch your imagination. You could create a dynamic configuration using persist
 
 = How does LudicrousDB support replication? =
 
-LudicrousDB does not provide replication services. That is done by configuring MySQL servers for replication. LudicrousDB can then be configured to use these servers appropriately, e.g. by connecting to master servers to perform write queries.
+LudicrousDB does not provide replication services. That is done by configuring MySQL servers for replication. LudicrousDB can then be configured to use these servers appropriately, e.g. by connecting to primary servers to perform write queries.
 
 = How does LudicrousDB support load balancing? =
 
@@ -138,7 +138,7 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 * Removed delay between connection retries and avoid immediate retry of same server when others are available to try.
 * Added connection stats.
 * Added save_query_callback for custom debug logging.
-* Refined SRTM granularity. Now only send reads to masters when the written table is involved.
+* Refined SRTM granularity. Now only send reads to primaries when the written table is involved.
 * Improved connection reuse logic and added mysql_ping to recover from "server has gone away".
 * Added min_tries to configure the minimum number of connection attempts before bailing.
 * Added WPDB_PATH constant. Define this if you'd rather not use ABSPATH . WPINC . '/wp-db.php'.
