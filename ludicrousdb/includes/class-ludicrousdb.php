@@ -265,7 +265,8 @@ class LudicrousDB extends wpdb {
 	 */
 	public function __construct( $dbuser = '', $dbpassword = '', $dbname = '', $dbhost = '' ) {
 
-		if ( WP_DEBUG && WP_DEBUG_DISPLAY ) {
+		// Show errors if debug-display mode is enabled
+		if ( $this->is_debug_display() ) {
 			$this->show_errors();
 		}
 
@@ -520,7 +521,37 @@ class LudicrousDB extends wpdb {
 	 * @return bool True if primary database is dead, false otherwise.
 	 */
 	public function is_primary_dead() {
-		return ( defined( 'PRIMARY_DB_DEAD' ) || defined( 'MASTER_DB_DEAD' ) );
+		return (
+			defined( 'PRIMARY_DB_DEAD' )
+			||
+			defined( 'MASTER_DB_DEAD' )
+		);
+	}
+
+	/**
+	 * Is debug mode enabled?
+	 *
+	 * @since 5.2.0
+	 */
+	public function is_debug() {
+		return (
+			( defined( 'LDB_DEBUG' ) && LDB_DEBUG )
+			||
+			( defined( 'WP_DEBUG' ) && WP_DEBUG )
+		);
+	}
+
+	/**
+	 * Is debug display mode enabled?
+	 *
+	 * @since 5.2.0
+	 */
+	public function is_debug_display() {
+		return (
+			$this->is_debug()
+			&&
+			( defined( 'WP_DEBUG_DISPLAY' ) && WP_DEBUG_DISPLAY )
+		);
 	}
 
 	/**
@@ -1423,7 +1454,7 @@ class LudicrousDB extends wpdb {
 		$error_reporting = false;
 
 		// Disable warnings, as we don't want to see a multitude of "unable to connect" messages
-		if ( WP_DEBUG ) {
+		if ( $this->is_debug() ) {
 			$error_reporting = error_reporting();
 			error_reporting( $error_reporting & ~E_WARNING );
 		}
@@ -1432,7 +1463,11 @@ class LudicrousDB extends wpdb {
 
 			// On the last try, re-enable warnings. We want to see a single instance of the
 			// "unable to connect" message on the bail() screen, if it appears.
-			if ( $this->reconnect_retries === $tries && WP_DEBUG ) {
+			if (
+				( $this->reconnect_retries === $tries )
+				&&
+				$this->is_debug()
+			) {
 				error_reporting( $error_reporting );
 			}
 
@@ -2082,7 +2117,7 @@ class LudicrousDB extends wpdb {
 
 		// Try to get a new socket
 		// phpcs:disable
-		$socket = ( WP_DEBUG )
+		$socket = $this->is_debug()
 			? fsockopen( $host, $port, $errno, $errstr, $float_timeout )
 			: @fsockopen( $host, $port, $errno, $errstr, $float_timeout );
 		// phpcs:enable
