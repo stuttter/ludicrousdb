@@ -1054,7 +1054,7 @@ class LudicrousDB extends wpdb {
 
 				// Maybe check TCP responsiveness
 				$tcp = ! empty( $this->check_tcp_responsiveness )
-					? $this->check_tcp_responsiveness( $host, $port, $timeout )
+					? $this->check_tcp_responsiveness( $db_config['host'], $port, $timeout )
 					: null;
 
 				// Connect if necessary or possible
@@ -1296,7 +1296,7 @@ class LudicrousDB extends wpdb {
 			$port_or_socket = substr( $port_or_socket, 1 );
 
 			if ( 0 !== strpos( $port_or_socket, '/' ) ) {
-				$port         = intval( $port_or_socket );
+				$port         = (int) $port_or_socket;
 				$maybe_socket = strstr( $port_or_socket, ':' );
 
 				if ( ! empty( $maybe_socket ) ) {
@@ -2273,7 +2273,31 @@ class LudicrousDB extends wpdb {
 	 * @return bool true when $host:$post responds within $float_timeout seconds, else false
 	 */
 	public function check_tcp_responsiveness( $host, $port, $float_timeout ) {
+		$socket = '';
 
+		// Maybe split host:port:socket into $host and $port and $socket
+		if ( strpos( $host, ':' ) ) {
+			$port_or_socket = strstr( $host, ':' );
+
+			$host           = substr( $host, 0, strpos( $host, ':' ) );
+			$port_or_socket = substr( $port_or_socket, 1 );
+
+			if ( 0 !== strpos( $port_or_socket, '/' ) ) {
+				$port         = (int) $port_or_socket;
+				$maybe_socket = strstr( $port_or_socket, ':' );
+
+				if ( ! empty( $maybe_socket ) ) {
+					$socket = substr( $maybe_socket, 1 );
+				}
+			} else {
+				$socket = $port_or_socket;
+			}
+		}
+
+		if ( ! empty( $socket ) ) {
+			$socket = 'unix://' . $socket;
+		}
+		
 		// Get the cache key
 		$cache_key = $this->tcp_get_cache_key( $host, $port );
 
