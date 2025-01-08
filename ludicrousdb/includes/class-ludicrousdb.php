@@ -2122,7 +2122,9 @@ class LudicrousDB extends wpdb {
 	 * @return false|string False on failure. Version number on success.
 	 */
 	public function db_version( $dbh_or_table = false ) {
-		return preg_replace( '/[^0-9.].*/', '', $this->db_server_info( $dbh_or_table ) );
+		$server_info = $this->db_server_info( $dbh_or_table );
+
+		return $server_info ? preg_replace( '/[^0-9.].*/', '', $server_info, 1 ) : false;
 	}
 
 	/**
