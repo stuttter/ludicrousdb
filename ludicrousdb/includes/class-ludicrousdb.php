@@ -2366,13 +2366,19 @@ class LudicrousDB extends wpdb {
 	 * @return bool True if we should try to ping the MySQL host, false otherwise.
 	 */
 	public function should_mysql_ping( $dbhname = '' ) {
+		if ( empty( $dbhname ) ) {
+			return false;
+		}
 
-		// Return false if empty handle or checks are disabled
 		if (
-			empty( $dbhname )
-			||
 			empty( $this->check_dbh_heartbeats )
+			&&
+			in_array( mysqli_errno( $this->dbhs[ $dbhname ] ), array( 2006, 4031 ), true )
 		) {
+			return true;
+		}
+
+		if ( empty( $this->check_dbh_heartbeats ) ) {
 			return false;
 		}
 
