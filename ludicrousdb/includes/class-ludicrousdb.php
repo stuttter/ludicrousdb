@@ -1639,7 +1639,7 @@ class LudicrousDB extends wpdb {
 		for ( $tries = 1; $tries <= $this->reconnect_retries; $tries++ ) {
 
 			// Try to reconnect
-			$retry = $this->db_connect( $this->die_on_disconnect, $query );
+			$retry = $this->db_connect( false, $query );
 
 			// Return true if the connection is up
 			if ( false !== $retry ) {
