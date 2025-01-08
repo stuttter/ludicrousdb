@@ -1606,7 +1606,7 @@ class LudicrousDB extends wpdb {
 		if (
 			$this->dbh_type_check( $dbh )
 			&&
-			mysqli_ping( $dbh )
+			mysqli_query( $dbh, 'DO 1' ) !== false
 		) {
 			return true;
 		}
