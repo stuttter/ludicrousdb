@@ -1055,7 +1055,7 @@ class LudicrousDB extends wpdb {
 				// Maybe check TCP responsiveness
 				$tcp = ! empty( $this->check_tcp_responsiveness )
 					? $this->check_tcp_responsiveness( $host, $port, $timeout )
-					: null;
+					: true;
 
 				// Connect if necessary or possible
 				if (
