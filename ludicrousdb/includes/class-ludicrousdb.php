@@ -1785,9 +1785,9 @@ class LudicrousDB extends wpdb {
 			&&
 			( $this->last_found_rows_result instanceof mysqli_result )
 		) {
-			$this->result = $this->last_found_rows_result;
-			$elapsed      = 0;
-
+			$this->result                 = $this->last_found_rows_result;
+			$this->last_found_rows_result = null;
+			$elapsed                      = 0;
 		} else {
 			$this->dbh = $this->db_connect( $query );
 
