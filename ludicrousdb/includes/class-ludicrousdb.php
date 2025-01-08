@@ -2384,7 +2384,7 @@ class LudicrousDB extends wpdb {
 		if (
 			! empty( $this->dbhname_heartbeats[ $dbhname ]['last_errno'] )
 			&&
-			( DB_SERVER_GONE_ERROR === $this->dbhname_heartbeats[ $dbhname ]['last_errno'] )
+			( in_array( $this->dbhname_heartbeats[ $dbhname ]['last_errno'], array( 2006, 4031 ), true ) )
 		) {
 
 			// Also clear the last error
