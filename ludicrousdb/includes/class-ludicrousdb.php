@@ -1812,6 +1812,20 @@ class LudicrousDB extends wpdb {
 
 			++$this->num_queries;
 
+			$mysql_errno = mysqli_errno( $this->dbh );
+			if ( $mysql_errno && ! empty( $this->check_dbh_heartbeats ) ) {
+				$dbhname = $this->lookup_dbhs_name( $this->dbh );
+
+				if ( ! empty( $dbhname ) ) {
+					$this->dbhname_heartbeats[ $dbhname ]['last_errno'] = $mysql_errno;
+				}
+			}
+
+			// retry the server and all other servers if the connection went away
+			if ( in_array( $mysql_errno, array( 2006, 4031 ), true ) ) {
+				return $this->query( $query );
+			}
+
 			if ( preg_match( '/^\s*SELECT\s+([A-Z_]+\s+)*SQL_CALC_FOUND_ROWS\s/i', $query ) ) {
 				if ( false === strpos( $query, 'NO_SELECT_FOUND_ROWS' ) ) {
 					$this->timer_start();
