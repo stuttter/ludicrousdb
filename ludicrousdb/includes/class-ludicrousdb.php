@@ -1340,6 +1340,8 @@ class LudicrousDB extends wpdb {
 
 			return false;
 		}
+
+		$this->update_heartbeat( $dbhname );
 	}
 
 	/**
@@ -1401,7 +1403,9 @@ class LudicrousDB extends wpdb {
 
 		$modes_str = implode( ',', $modes );
 
-		mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" );
+		if ( mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" ) ) {
+			$this->update_heartbeat( $dbh );
+		}
 	}
 
 	/**
@@ -1426,6 +1430,10 @@ class LudicrousDB extends wpdb {
 		}
 
 		$success = mysqli_select_db( $dbh, $db );
+
+		if ( $success ) {
+			$this->update_heartbeat( $dbh );
+		}
 
 		return $success;
 	}
@@ -1608,6 +1616,7 @@ class LudicrousDB extends wpdb {
 			&&
 			mysqli_ping( $dbh )
 		) {
+			$this->update_heartbeat( $dbh );
 			return true;
 		}
 
@@ -1931,17 +1940,7 @@ class LudicrousDB extends wpdb {
 			}
 		}
 
-		// Maybe log last used to heartbeats
-		if ( ! empty( $this->check_dbh_heartbeats ) ) {
-
-			// Lookup name
-			$name = $this->lookup_dbhs_name( $dbh );
-
-			// Set last used for this dbh
-			if ( ! empty( $name ) ) {
-				$this->dbhname_heartbeats[ $name ]['last_used'] = microtime( true );
-			}
-		}
+		$this->update_heartbeat( $dbh );
 
 		return $result;
 	}
@@ -2145,6 +2144,8 @@ class LudicrousDB extends wpdb {
 		}
 
 		$server_info = mysqli_get_server_info( $dbh );
+
+		$this->update_heartbeat( $dbh );
 
 		return $server_info;
 	}
@@ -2787,6 +2788,36 @@ class LudicrousDB extends wpdb {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Update the heartbeat
+	 *
+	 * @param string|object $dbhname_or_dbh To update the heartbeat for
+	 *
+	 * @return void
+	 */
+	protected function update_heartbeat( $dbhname_or_dbh ) {
+		if ( ! $this->check_dbh_heartbeats ) {
+			return;
+		}
+
+		if ( is_string( $dbhname_or_dbh ) ) {
+			$dbhname = $dbhname_or_dbh;
+		} else {
+			$dbhname = $this->lookup_dbhs_name( $dbhname_or_dbh );
+		}
+
+		// Set last used for this dbh
+		if ( empty( $dbhname ) ) {
+			return;
+		}
+
+		if ( ! isset( $this->dbhname_heartbeats[ $dbhname ] ) ) {
+			$this->dbhname_heartbeats[ $dbhname ] = array();
+		}
+
+		$this->dbhname_heartbeats[ $dbhname ]['last_used'] = microtime( true );
 	}
 
 	/**
