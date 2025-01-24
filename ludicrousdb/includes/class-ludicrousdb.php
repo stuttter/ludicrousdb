@@ -2296,6 +2296,11 @@ class LudicrousDB extends wpdb {
 		$errno  = 0;
 		$errstr = '';
 
+		if ( strstr( $host, ':' ) !== false ) {
+			$host = 'unix://' . substr( $host, strpos( $host, ':' ) + 1 );
+			$port = -1;
+		}
+
 		// Try to get a new socket
 		// phpcs:disable
 		$socket = $this->is_debug()
