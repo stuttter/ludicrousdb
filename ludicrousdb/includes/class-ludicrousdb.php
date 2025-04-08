@@ -1847,7 +1847,7 @@ class LudicrousDB extends wpdb {
 		if ( preg_match( '/^\s*(create|alter|truncate|drop)\s/i', $query ) ) {
 			$retval = $this->result;
 
-		} elseif ( preg_match( '/^\\s*(insert|delete|update|replace|alter) /i', $query ) ) {
+		} elseif ( preg_match( '/^\s*(insert|delete|update|replace|alter) /i', $query ) ) {
 			$this->rows_affected = mysqli_affected_rows( $this->dbh );
 
 			// Take note of the insert_id
