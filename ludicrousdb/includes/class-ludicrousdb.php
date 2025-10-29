@@ -1614,7 +1614,7 @@ class LudicrousDB extends wpdb {
 		if (
 			$this->dbh_type_check( $dbh )
 			&&
-			mysqli_ping( $dbh )
+			mysqli_query( $dbh, 'DO 1' ) !== false
 		) {
 			$this->update_heartbeat( $dbh );
 			return true;
@@ -1794,9 +1794,9 @@ class LudicrousDB extends wpdb {
 			&&
 			( $this->last_found_rows_result instanceof mysqli_result )
 		) {
-			$this->result = $this->last_found_rows_result;
-			$elapsed      = 0;
-
+			$this->result                 = $this->last_found_rows_result;
+			$this->last_found_rows_result = null;
+			$elapsed                      = 0;
 		} else {
 			$this->dbh = $this->db_connect( $query );
 
@@ -1826,7 +1826,7 @@ class LudicrousDB extends wpdb {
 				return $this->query( $query );
 			}
 
-			if ( preg_match( '/^\s*SELECT\s+([A-Z_]+\s+)*SQL_CALC_FOUND_ROWS\s/i', $query ) ) {
+			if ( preg_match( '/^\s*SELECT\s+([A-Z_]+\s+)*SQL_CALC_FOUND_ROWS\s/i', $query ) && false !== $this->result ) {
 				if ( false === strpos( $query, 'NO_SELECT_FOUND_ROWS' ) ) {
 					$this->timer_start();
 					$this->last_found_rows_result = $this->_do_query( 'SELECT FOUND_ROWS()', $this->dbh );
@@ -2416,7 +2416,7 @@ class LudicrousDB extends wpdb {
 		if (
 			! empty( $this->dbhname_heartbeats[ $dbhname ]['last_errno'] )
 			&&
-			( DB_SERVER_GONE_ERROR === $this->dbhname_heartbeats[ $dbhname ]['last_errno'] )
+			( in_array( $this->dbhname_heartbeats[ $dbhname ]['last_errno'], array( 2006, 4031 ), true ) )
 		) {
 
 			// Also clear the last error
