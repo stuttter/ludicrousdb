@@ -1810,6 +1810,8 @@ class LudicrousDB extends wpdb {
 					$elapsed                     += $this->timer_stop();
 					++$this->num_queries;
 					$query .= '; SELECT FOUND_ROWS()';
+				} else {
+					$this->last_found_rows_result = null;
 				}
 			} else {
 				$this->last_found_rows_result = null;
