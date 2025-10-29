@@ -1340,6 +1340,8 @@ class LudicrousDB extends wpdb {
 
 			return false;
 		}
+
+		$this->update_heartbeat( $dbhname );
 	}
 
 	/**
@@ -1401,7 +1403,9 @@ class LudicrousDB extends wpdb {
 
 		$modes_str = implode( ',', $modes );
 
-		mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" );
+		if ( mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" ) ) {
+			$this->update_heartbeat( $dbh );
+		}
 	}
 
 	/**
@@ -1426,6 +1430,10 @@ class LudicrousDB extends wpdb {
 		}
 
 		$success = mysqli_select_db( $dbh, $db );
+
+		if ( $success ) {
+			$this->update_heartbeat( $dbh );
+		}
 
 		return $success;
 	}
@@ -1608,6 +1616,7 @@ class LudicrousDB extends wpdb {
 			&&
 			mysqli_ping( $dbh )
 		) {
+			$this->update_heartbeat( $dbh );
 			return true;
 		}
 
@@ -1803,6 +1812,20 @@ class LudicrousDB extends wpdb {
 
 			++$this->num_queries;
 
+			$mysql_errno = mysqli_errno( $this->dbh );
+			if ( $mysql_errno && ! empty( $this->check_dbh_heartbeats ) ) {
+				$dbhname = $this->lookup_dbhs_name( $this->dbh );
+
+				if ( ! empty( $dbhname ) ) {
+					$this->dbhname_heartbeats[ $dbhname ]['last_errno'] = $mysql_errno;
+				}
+			}
+
+			// retry the server and all other servers if the connection went away
+			if ( in_array( $mysql_errno, array( 2006, 4031 ), true ) ) {
+				return $this->query( $query );
+			}
+
 			if ( preg_match( '/^\s*SELECT\s+([A-Z_]+\s+)*SQL_CALC_FOUND_ROWS\s/i', $query ) ) {
 				if ( false === strpos( $query, 'NO_SELECT_FOUND_ROWS' ) ) {
 					$this->timer_start();
@@ -1933,17 +1956,7 @@ class LudicrousDB extends wpdb {
 			}
 		}
 
-		// Maybe log last used to heartbeats
-		if ( ! empty( $this->check_dbh_heartbeats ) ) {
-
-			// Lookup name
-			$name = $this->lookup_dbhs_name( $dbh );
-
-			// Set last used for this dbh
-			if ( ! empty( $name ) ) {
-				$this->dbhname_heartbeats[ $name ]['last_used'] = microtime( true );
-			}
-		}
+		$this->update_heartbeat( $dbh );
 
 		return $result;
 	}
@@ -2149,6 +2162,8 @@ class LudicrousDB extends wpdb {
 		}
 
 		$server_info = mysqli_get_server_info( $dbh );
+
+		$this->update_heartbeat( $dbh );
 
 		return $server_info;
 	}
@@ -2369,13 +2384,19 @@ class LudicrousDB extends wpdb {
 	 * @return bool True if we should try to ping the MySQL host, false otherwise.
 	 */
 	public function should_mysql_ping( $dbhname = '' ) {
+		if ( empty( $dbhname ) ) {
+			return false;
+		}
 
-		// Return false if empty handle or checks are disabled
 		if (
-			empty( $dbhname )
-			||
 			empty( $this->check_dbh_heartbeats )
+			&&
+			in_array( mysqli_errno( $this->dbhs[ $dbhname ] ), array( 2006, 4031 ), true )
 		) {
+			return true;
+		}
+
+		if ( empty( $this->check_dbh_heartbeats ) ) {
 			return false;
 		}
 
@@ -2791,6 +2812,36 @@ class LudicrousDB extends wpdb {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Update the heartbeat
+	 *
+	 * @param string|object $dbhname_or_dbh To update the heartbeat for
+	 *
+	 * @return void
+	 */
+	protected function update_heartbeat( $dbhname_or_dbh ) {
+		if ( ! $this->check_dbh_heartbeats ) {
+			return;
+		}
+
+		if ( is_string( $dbhname_or_dbh ) ) {
+			$dbhname = $dbhname_or_dbh;
+		} else {
+			$dbhname = $this->lookup_dbhs_name( $dbhname_or_dbh );
+		}
+
+		// Set last used for this dbh
+		if ( empty( $dbhname ) ) {
+			return;
+		}
+
+		if ( ! isset( $this->dbhname_heartbeats[ $dbhname ] ) ) {
+			$this->dbhname_heartbeats[ $dbhname ] = array();
+		}
+
+		$this->dbhname_heartbeats[ $dbhname ]['last_used'] = microtime( true );
 	}
 
 	/**
