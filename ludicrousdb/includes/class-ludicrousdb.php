@@ -1052,10 +1052,7 @@ class LudicrousDB extends wpdb {
 
 				$this->timer_start();
 
-				// Maybe check TCP responsiveness
-				$tcp = ! empty( $this->check_tcp_responsiveness )
-					? $this->check_tcp_responsiveness( $host, $port, $timeout )
-					: null;
+				$tcp = $this->check_tcp_responsiveness( $host, $port, $timeout );
 
 				// Connect if necessary or possible
 				if (
@@ -1272,6 +1269,7 @@ class LudicrousDB extends wpdb {
 	 * @return bool|mysqli|resource
 	 */
 	protected function single_db_connect( $dbhname, $host, $user, $password ) {
+		$tcp_cache_key = $host;
 		$this->is_mysql = true;
 
 		// Check client flags
@@ -1338,8 +1336,12 @@ class LudicrousDB extends wpdb {
 		if ( ! empty( $this->dbhs[ $dbhname ]->connect_errno ) ) {
 			$this->dbhs[ $dbhname ] = false;
 
+			$this->tcp_cache_set( $tcp_cache_key, 'down' );
+
 			return false;
 		}
+
+		$this->update_heartbeat( $dbhname );
 	}
 
 	/**
@@ -1401,7 +1403,9 @@ class LudicrousDB extends wpdb {
 
 		$modes_str = implode( ',', $modes );
 
-		mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" );
+		if ( mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" ) ) {
+			$this->update_heartbeat( $dbh );
+		}
 	}
 
 	/**
@@ -1426,6 +1430,10 @@ class LudicrousDB extends wpdb {
 		}
 
 		$success = mysqli_select_db( $dbh, $db );
+
+		if ( $success ) {
+			$this->update_heartbeat( $dbh );
+		}
 
 		return $success;
 	}
@@ -1608,6 +1616,7 @@ class LudicrousDB extends wpdb {
 			&&
 			mysqli_query( $dbh, 'DO 1' ) !== false
 		) {
+			$this->update_heartbeat( $dbh );
 			return true;
 		}
 
@@ -1803,6 +1812,20 @@ class LudicrousDB extends wpdb {
 
 			++$this->num_queries;
 
+			$mysql_errno = mysqli_errno( $this->dbh );
+			if ( $mysql_errno && ! empty( $this->check_dbh_heartbeats ) ) {
+				$dbhname = $this->lookup_dbhs_name( $this->dbh );
+
+				if ( ! empty( $dbhname ) ) {
+					$this->dbhname_heartbeats[ $dbhname ]['last_errno'] = $mysql_errno;
+				}
+			}
+
+			// retry the server and all other servers if the connection went away
+			if ( in_array( $mysql_errno, array( 2006, 4031 ), true ) ) {
+				return $this->query( $query );
+			}
+
 			if ( preg_match( '/^\s*SELECT\s+([A-Z_]+\s+)*SQL_CALC_FOUND_ROWS\s/i', $query ) && false !== $this->result ) {
 				if ( false === strpos( $query, 'NO_SELECT_FOUND_ROWS' ) ) {
 					$this->timer_start();
@@ -1810,6 +1833,8 @@ class LudicrousDB extends wpdb {
 					$elapsed                     += $this->timer_stop();
 					++$this->num_queries;
 					$query .= '; SELECT FOUND_ROWS()';
+				} else {
+					$this->last_found_rows_result = null;
 				}
 			} else {
 				$this->last_found_rows_result = null;
@@ -1847,7 +1872,7 @@ class LudicrousDB extends wpdb {
 		if ( preg_match( '/^\s*(create|alter|truncate|drop)\s/i', $query ) ) {
 			$retval = $this->result;
 
-		} elseif ( preg_match( '/^\\s*(insert|delete|update|replace|alter) /i', $query ) ) {
+		} elseif ( preg_match( '/^\s*(insert|delete|update|replace|alter) /i', $query ) ) {
 			$this->rows_affected = mysqli_affected_rows( $this->dbh );
 
 			// Take note of the insert_id
@@ -1931,17 +1956,7 @@ class LudicrousDB extends wpdb {
 			}
 		}
 
-		// Maybe log last used to heartbeats
-		if ( ! empty( $this->check_dbh_heartbeats ) ) {
-
-			// Lookup name
-			$name = $this->lookup_dbhs_name( $dbh );
-
-			// Set last used for this dbh
-			if ( ! empty( $name ) ) {
-				$this->dbhname_heartbeats[ $name ]['last_used'] = microtime( true );
-			}
-		}
+		$this->update_heartbeat( $dbh );
 
 		return $result;
 	}
@@ -2122,7 +2137,9 @@ class LudicrousDB extends wpdb {
 	 * @return false|string False on failure. Version number on success.
 	 */
 	public function db_version( $dbh_or_table = false ) {
-		return preg_replace( '/[^0-9.].*/', '', $this->db_server_info( $dbh_or_table ) );
+		$server_info = $this->db_server_info( $dbh_or_table );
+
+		return $server_info ? preg_replace( '/[^0-9.].*/', '', $server_info, 1 ) : false;
 	}
 
 	/**
@@ -2145,6 +2162,8 @@ class LudicrousDB extends wpdb {
 		}
 
 		$server_info = mysqli_get_server_info( $dbh );
+
+		$this->update_heartbeat( $dbh );
 
 		return $server_info;
 	}
@@ -2291,6 +2310,11 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
+		if ( empty( $this->check_tcp_responsiveness ) ) {
+			$this->tcp_responsive = true;
+			return true;
+		}
+
 		// Defaults
 		$errno  = 0;
 		$errstr = '';
@@ -2305,6 +2329,7 @@ class LudicrousDB extends wpdb {
 		// No socket
 		if ( false === $socket ) {
 			$this->tcp_cache_set( $cache_key, 'down' );
+			$this->tcp_responsive = false;
 
 			return "[ > {$float_timeout} ] ({$errno}) '{$errstr}'";
 		}
@@ -2315,6 +2340,7 @@ class LudicrousDB extends wpdb {
 
 		// Using API
 		$this->tcp_cache_set( $cache_key, 'up' );
+		$this->tcp_responsive = true;
 
 		return true;
 	}
@@ -2365,13 +2391,19 @@ class LudicrousDB extends wpdb {
 	 * @return bool True if we should try to ping the MySQL host, false otherwise.
 	 */
 	public function should_mysql_ping( $dbhname = '' ) {
+		if ( empty( $dbhname ) ) {
+			return false;
+		}
 
-		// Return false if empty handle or checks are disabled
 		if (
-			empty( $dbhname )
-			||
 			empty( $this->check_dbh_heartbeats )
+			&&
+			in_array( mysqli_errno( $this->dbhs[ $dbhname ] ), array( 2006, 4031 ), true )
 		) {
+			return true;
+		}
+
+		if ( empty( $this->check_dbh_heartbeats ) ) {
 			return false;
 		}
 
@@ -2787,6 +2819,36 @@ class LudicrousDB extends wpdb {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Update the heartbeat
+	 *
+	 * @param string|object $dbhname_or_dbh To update the heartbeat for
+	 *
+	 * @return void
+	 */
+	protected function update_heartbeat( $dbhname_or_dbh ) {
+		if ( ! $this->check_dbh_heartbeats ) {
+			return;
+		}
+
+		if ( is_string( $dbhname_or_dbh ) ) {
+			$dbhname = $dbhname_or_dbh;
+		} else {
+			$dbhname = $this->lookup_dbhs_name( $dbhname_or_dbh );
+		}
+
+		// Set last used for this dbh
+		if ( empty( $dbhname ) ) {
+			return;
+		}
+
+		if ( ! isset( $this->dbhname_heartbeats[ $dbhname ] ) ) {
+			$this->dbhname_heartbeats[ $dbhname ] = array();
+		}
+
+		$this->dbhname_heartbeats[ $dbhname ]['last_used'] = microtime( true );
 	}
 
 	/**
