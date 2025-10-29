@@ -685,11 +685,20 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
+	 * @param bool $allow_bail Unused. For WP compat only.
 	 * @param string $query Query.
 	 *
 	 * @return resource MySQL database connection
 	 */
-	public function db_connect( $query = '' ) {
+	public function db_connect( $allow_bail = null, $query = '' ) {
+		if ( is_string( $allow_bail ) && $query === '' ) {
+			$query = $allow_bail;
+			// for reference only, not used, since this is generally not what we want here
+			// $allow_bail = $this->die_on_disconnect;
+		} elseif ( $allow_bail === null ) {
+			// unlike WP core we can try another server if one fails
+			// $allow_bail = $this->die_on_disconnect;
+		}
 
 		// Bail if empty query
 		if ( empty( $query ) ) {
@@ -1416,14 +1425,20 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string                       $db           MySQL database name.
-	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
-	 *                                                   - the current database
-	 *                                                   - the database housing the specified table
-	 *                                                   - the database of the MySQL resource
+	 * @param string                $db    MySQL database name.
+	 * @param false|mysqli|resource $dbh   Optional. The database. One of:
+	*                                       - the current database
+	*                                       - the database housing the specified table
+	*                                       - the database of the MySQL resource
+	 * @param false|string          $table Optional. The table name. Only used if $dbh is false
 	 */
-	public function select( $db, $dbh_or_table = false ) {
-		$dbh = $this->get_db_object( $dbh_or_table );
+	public function select( $db, $dbh = false, $table = false ) {
+		if ( $dbh === false ) {
+			$dbh = $this->get_db_object( $table );
+		} elseif ( is_string( $dbh ) ) {
+			// backwards-compat of $dbh_or_table
+			$dbh = $this->get_db_object( $dbh );
+		}
 
 		if ( ! $this->dbh_type_check( $dbh ) ) {
 			return false;
@@ -1476,17 +1491,17 @@ class LudicrousDB extends wpdb {
 	 * See set_charset().
 	 *
 	 * @since 1.0.0
-	 * @param string $to_escape String to escape.
+	 * @param string $data String to escape.
 	 */
-	public function _real_escape( $to_escape = '' ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
+	public function _real_escape( $data = '' ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
 
 		// Bail if not a scalar
-		if ( ! is_scalar( $to_escape ) ) {
+		if ( ! is_scalar( $data ) ) {
 			return '';
 		}
 
 		// Slash the query part
-		$escaped = addslashes( $to_escape );
+		$escaped = addslashes( $data );
 
 		// Maybe use WordPress core placeholder method
 		if ( method_exists( $this, 'add_placeholder_escape' ) ) {
@@ -1601,13 +1616,13 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param bool   $die_on_disconnect Optional. Allows the function to die. Default true.
+	 * @param bool   $allow_bail        Optional. Allows the function to die. Default true.
 	 * @param bool   $dbh_or_table      Optional.
 	 * @param string $query             Optional. Query string passed db_connect
 	 *
 	 * @return bool|void True if the connection is up.
 	 */
-	public function check_connection( $die_on_disconnect = true, $dbh_or_table = false, $query = '' ) {
+	public function check_connection( $allow_bail = true, $dbh_or_table = false, $query = '' ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
 
 		// Return true if ping is successful. This is the most common case.
@@ -1633,7 +1648,7 @@ class LudicrousDB extends wpdb {
 		for ( $tries = 1; $tries <= $this->reconnect_retries; $tries++ ) {
 
 			// Try to reconnect
-			$retry = $this->db_connect( $query );
+			$retry = $this->db_connect( false, $query );
 
 			// Return true if the connection is up
 			if ( false !== $retry ) {
@@ -1655,7 +1670,7 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Bail here if not allowed to call $this->bail()
-		if ( false === $die_on_disconnect ) {
+		if ( false === $allow_bail ) {
 			return false;
 		}
 
@@ -1798,7 +1813,7 @@ class LudicrousDB extends wpdb {
 			$elapsed      = 0;
 
 		} else {
-			$this->dbh = $this->db_connect( $query );
+			$this->dbh = $this->db_connect( $this->die_on_disconnect, $query );
 
 			if ( ! $this->dbh_type_check( $this->dbh ) ) {
 				$this->run_query_log_callbacks( $query, $retval );
@@ -2198,7 +2213,7 @@ class LudicrousDB extends wpdb {
 
 			// Table name
 		} elseif ( is_string( $dbh_or_table ) ) {
-			$dbh = $this->db_connect( "SELECT FROM {$dbh_or_table} {$this->users}" );
+			$dbh = $this->db_connect( $this->die_on_disconnect, "SELECT FROM {$dbh_or_table} {$this->users}" );
 		}
 
 		return $dbh;
