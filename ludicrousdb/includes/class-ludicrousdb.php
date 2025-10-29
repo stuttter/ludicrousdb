@@ -1052,10 +1052,7 @@ class LudicrousDB extends wpdb {
 
 				$this->timer_start();
 
-				// Maybe check TCP responsiveness
-				$tcp = ! empty( $this->check_tcp_responsiveness )
-					? $this->check_tcp_responsiveness( $host, $port, $timeout )
-					: null;
+				$tcp = $this->check_tcp_responsiveness( $host, $port, $timeout );
 
 				// Connect if necessary or possible
 				if (
@@ -1272,6 +1269,7 @@ class LudicrousDB extends wpdb {
 	 * @return bool|mysqli|resource
 	 */
 	protected function single_db_connect( $dbhname, $host, $user, $password ) {
+		$tcp_cache_key = $host;
 		$this->is_mysql = true;
 
 		// Check client flags
@@ -1337,6 +1335,8 @@ class LudicrousDB extends wpdb {
 		// Bail if connection failed
 		if ( ! empty( $this->dbhs[ $dbhname ]->connect_errno ) ) {
 			$this->dbhs[ $dbhname ] = false;
+
+			$this->tcp_cache_set( $tcp_cache_key, 'down' );
 
 			return false;
 		}
@@ -2310,6 +2310,11 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
+		if ( empty( $this->check_tcp_responsiveness ) ) {
+			$this->tcp_responsive = true;
+			return true;
+		}
+
 		// Defaults
 		$errno  = 0;
 		$errstr = '';
@@ -2324,6 +2329,7 @@ class LudicrousDB extends wpdb {
 		// No socket
 		if ( false === $socket ) {
 			$this->tcp_cache_set( $cache_key, 'down' );
+			$this->tcp_responsive = false;
 
 			return "[ > {$float_timeout} ] ({$errno}) '{$errstr}'";
 		}
@@ -2334,6 +2340,7 @@ class LudicrousDB extends wpdb {
 
 		// Using API
 		$this->tcp_cache_set( $cache_key, 'up' );
+		$this->tcp_responsive = true;
 
 		return true;
 	}
