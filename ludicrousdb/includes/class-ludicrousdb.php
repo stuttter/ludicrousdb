@@ -1301,7 +1301,8 @@ class LudicrousDB extends wpdb {
 					$socket = substr( $maybe_socket, 1 );
 				}
 			} else {
-				$socket = $port_or_socket;
+				// otherwise it will fail if the host is specified originally like ':/var/lib/mysql/mysql.sock', since we will have a port appended here still
+				$socket = strtok( $port_or_socket, ':' );
 			}
 		}
 
@@ -2318,6 +2319,11 @@ class LudicrousDB extends wpdb {
 		// Defaults
 		$errno  = 0;
 		$errstr = '';
+
+		if ( strstr( $host, ':' ) !== false ) {
+			$host = 'unix://' . substr( $host, strpos( $host, ':' ) + 1 );
+			$port = -1;
+		}
 
 		// Try to get a new socket
 		// phpcs:disable
