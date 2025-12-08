@@ -1052,10 +1052,7 @@ class LudicrousDB extends wpdb {
 
 				$this->timer_start();
 
-				// Maybe check TCP responsiveness
-				$tcp = ! empty( $this->check_tcp_responsiveness )
-					? $this->check_tcp_responsiveness( $db_config['host'], $port, $timeout )
-					: null;
+				$tcp = $this->check_tcp_responsiveness( $host, $port, $timeout );
 
 				// Connect if necessary or possible
 				if (
@@ -1272,6 +1269,7 @@ class LudicrousDB extends wpdb {
 	 * @return bool|mysqli|resource
 	 */
 	protected function single_db_connect( $dbhname, $host, $user, $password ) {
+		$tcp_cache_key  = $host;
 		$this->is_mysql = true;
 
 		// Check client flags
@@ -1338,8 +1336,12 @@ class LudicrousDB extends wpdb {
 		if ( ! empty( $this->dbhs[ $dbhname ]->connect_errno ) ) {
 			$this->dbhs[ $dbhname ] = false;
 
+			$this->tcp_cache_set( $tcp_cache_key, 'down' );
+
 			return false;
 		}
+
+		$this->update_heartbeat( $dbhname );
 	}
 
 	/**
@@ -1401,7 +1403,9 @@ class LudicrousDB extends wpdb {
 
 		$modes_str = implode( ',', $modes );
 
-		mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" );
+		if ( mysqli_query( $dbh, "SET SESSION sql_mode='{$modes_str}'" ) ) {
+			$this->update_heartbeat( $dbh );
+		}
 	}
 
 	/**
@@ -1426,6 +1430,10 @@ class LudicrousDB extends wpdb {
 		}
 
 		$success = mysqli_select_db( $dbh, $db );
+
+		if ( $success ) {
+			$this->update_heartbeat( $dbh );
+		}
 
 		return $success;
 	}
@@ -1602,13 +1610,36 @@ class LudicrousDB extends wpdb {
 	public function check_connection( $die_on_disconnect = true, $dbh_or_table = false, $query = '' ) {
 		$dbh = $this->get_db_object( $dbh_or_table );
 
-		// Return true if ping is successful. This is the most common case.
-		if (
-			$this->dbh_type_check( $dbh )
-			&&
-			mysqli_ping( $dbh )
-		) {
-			return true;
+		// Return true if connection is alive. This is the most common case.
+		if ( $this->dbh_type_check( $dbh ) ) {
+			$mysql_errno = mysqli_errno( $dbh );
+
+			/*
+			 * Check connection health based on the last MySQL error code.
+			 * Unlike mysqli_ping() which actively tests the connection, we check
+			 * the error state from the last operation:
+			 *
+			 * - errno 0: No error, connection is healthy (or no operations performed yet)
+			 * - errno 2006 (DB_SERVER_GONE_ERROR): Server has gone away, reconnect needed
+			 * - errno 4031 (DB_SERVER_LOST_ERROR): Connection was lost, reconnect needed
+			 * - Other errno: Query/operation error, but connection is still alive
+			 *
+			 * Note: This passive approach means a stale connection with no operations
+			 * may be considered alive until the next query reveals otherwise. This is
+			 * an acceptable trade-off to avoid the deprecated mysqli_ping() function.
+			 */
+			if ( 0 === $mysql_errno ) {
+				$this->update_heartbeat( $dbh );
+				return true;
+			}
+
+			// If there's a "server gone away" error, the connection is dead and needs reconnection.
+			// Let execution continue to reconnection logic below.
+			if ( ! in_array( $mysql_errno, array( DB_SERVER_GONE_ERROR, DB_SERVER_LOST_ERROR ), true ) ) {
+				// Other errors (query errors, etc.) don't indicate a dead connection.
+				// Consider the connection alive but don't update heartbeat.
+				return true;
+			}
 		}
 
 		// Default to false
@@ -1785,9 +1816,9 @@ class LudicrousDB extends wpdb {
 			&&
 			( $this->last_found_rows_result instanceof mysqli_result )
 		) {
-			$this->result = $this->last_found_rows_result;
-			$elapsed      = 0;
-
+			$this->result                 = $this->last_found_rows_result;
+			$this->last_found_rows_result = null;
+			$elapsed                      = 0;
 		} else {
 			$this->dbh = $this->db_connect( $query );
 
@@ -1803,13 +1834,29 @@ class LudicrousDB extends wpdb {
 
 			++$this->num_queries;
 
-			if ( preg_match( '/^\s*SELECT\s+([A-Z_]+\s+)*SQL_CALC_FOUND_ROWS\s/i', $query ) ) {
+			$mysql_errno = mysqli_errno( $this->dbh );
+			if ( $mysql_errno && ! empty( $this->check_dbh_heartbeats ) ) {
+				$dbhname = $this->lookup_dbhs_name( $this->dbh );
+
+				if ( ! empty( $dbhname ) ) {
+					$this->dbhname_heartbeats[ $dbhname ]['last_errno'] = $mysql_errno;
+				}
+			}
+
+			// retry the server and all other servers if the connection went away
+			if ( in_array( $mysql_errno, array( DB_SERVER_GONE_ERROR, DB_SERVER_LOST_ERROR ), true ) ) {
+				return $this->query( $query );
+			}
+
+			if ( preg_match( '/^\s*SELECT\s+([A-Z_]+\s+)*SQL_CALC_FOUND_ROWS\s/i', $query ) && false !== $this->result ) {
 				if ( false === strpos( $query, 'NO_SELECT_FOUND_ROWS' ) ) {
 					$this->timer_start();
 					$this->last_found_rows_result = $this->_do_query( 'SELECT FOUND_ROWS()', $this->dbh );
 					$elapsed                     += $this->timer_stop();
 					++$this->num_queries;
 					$query .= '; SELECT FOUND_ROWS()';
+				} else {
+					$this->last_found_rows_result = null;
 				}
 			} else {
 				$this->last_found_rows_result = null;
@@ -1847,7 +1894,7 @@ class LudicrousDB extends wpdb {
 		if ( preg_match( '/^\s*(create|alter|truncate|drop)\s/i', $query ) ) {
 			$retval = $this->result;
 
-		} elseif ( preg_match( '/^\\s*(insert|delete|update|replace|alter) /i', $query ) ) {
+		} elseif ( preg_match( '/^\s*(insert|delete|update|replace|alter) /i', $query ) ) {
 			$this->rows_affected = mysqli_affected_rows( $this->dbh );
 
 			// Take note of the insert_id
@@ -1931,17 +1978,7 @@ class LudicrousDB extends wpdb {
 			}
 		}
 
-		// Maybe log last used to heartbeats
-		if ( ! empty( $this->check_dbh_heartbeats ) ) {
-
-			// Lookup name
-			$name = $this->lookup_dbhs_name( $dbh );
-
-			// Set last used for this dbh
-			if ( ! empty( $name ) ) {
-				$this->dbhname_heartbeats[ $name ]['last_used'] = microtime( true );
-			}
-		}
+		$this->update_heartbeat( $dbh );
 
 		return $result;
 	}
@@ -2122,7 +2159,9 @@ class LudicrousDB extends wpdb {
 	 * @return false|string False on failure. Version number on success.
 	 */
 	public function db_version( $dbh_or_table = false ) {
-		return preg_replace( '/[^0-9.].*/', '', $this->db_server_info( $dbh_or_table ) );
+		$server_info = $this->db_server_info( $dbh_or_table );
+
+		return $server_info ? preg_replace( '/[^0-9.].*/', '', $server_info, 1 ) : false;
 	}
 
 	/**
@@ -2145,6 +2184,8 @@ class LudicrousDB extends wpdb {
 		}
 
 		$server_info = mysqli_get_server_info( $dbh );
+
+		$this->update_heartbeat( $dbh );
 
 		return $server_info;
 	}
@@ -2275,6 +2316,12 @@ class LudicrousDB extends wpdb {
 	public function check_tcp_responsiveness( $host, $port, $float_timeout ) {
 $socket = '';
 
+    // Bail if disabled
+		if ( empty( $this->check_tcp_responsiveness ) ) {
+			$this->tcp_responsive = true;
+			return true;
+		}
+
 		// Maybe split host:port:socket into $host and $port and $socket
 		if ( strpos( $host, ':' ) ) {
 			$port_or_socket = strstr( $host, ':' );
@@ -2297,7 +2344,7 @@ $socket = '';
 		if ( ! empty( $socket ) ) {
 			$socket = 'unix://' . $socket;
 		}
-		
+
 		// Get the cache key
 		$cache_key = $this->tcp_get_cache_key( $host, $port );
 
@@ -2335,6 +2382,7 @@ $socket = '';
 		// No socket
 		if ( false === $check_socket ) {
 			$this->tcp_cache_set( $cache_key, 'down' );
+			$this->tcp_responsive = false;
 
 			return "[ > {$float_timeout} ] ({$errno}) '{$errstr}'";
 		}
@@ -2345,6 +2393,7 @@ $socket = '';
 
 		// Using API
 		$this->tcp_cache_set( $cache_key, 'up' );
+		$this->tcp_responsive = true;
 
 		return true;
 	}
@@ -2395,13 +2444,23 @@ $socket = '';
 	 * @return bool True if we should try to ping the MySQL host, false otherwise.
 	 */
 	public function should_mysql_ping( $dbhname = '' ) {
+		if ( empty( $dbhname ) ) {
+			return false;
+		}
 
-		// Return false if empty handle or checks are disabled
 		if (
-			empty( $dbhname )
-			||
 			empty( $this->check_dbh_heartbeats )
+			&&
+			isset( $this->dbhs[ $dbhname ] )
+			&&
+			$this->dbh_type_check( $this->dbhs[ $dbhname ] )
+			&&
+			in_array( mysqli_errno( $this->dbhs[ $dbhname ] ), array( DB_SERVER_GONE_ERROR, DB_SERVER_LOST_ERROR ), true )
 		) {
+			return true;
+		}
+
+		if ( empty( $this->check_dbh_heartbeats ) ) {
 			return false;
 		}
 
@@ -2414,7 +2473,7 @@ $socket = '';
 		if (
 			! empty( $this->dbhname_heartbeats[ $dbhname ]['last_errno'] )
 			&&
-			( DB_SERVER_GONE_ERROR === $this->dbhname_heartbeats[ $dbhname ]['last_errno'] )
+			in_array( $this->dbhname_heartbeats[ $dbhname ]['last_errno'], array( DB_SERVER_GONE_ERROR, DB_SERVER_LOST_ERROR ), true )
 		) {
 
 			// Also clear the last error
@@ -2817,6 +2876,36 @@ $socket = '';
 		}
 
 		return true;
+	}
+
+	/**
+	 * Update the heartbeat
+	 *
+	 * @param string|object $dbhname_or_dbh To update the heartbeat for
+	 *
+	 * @return void
+	 */
+	protected function update_heartbeat( $dbhname_or_dbh ) {
+		if ( ! $this->check_dbh_heartbeats ) {
+			return;
+		}
+
+		if ( is_string( $dbhname_or_dbh ) ) {
+			$dbhname = $dbhname_or_dbh;
+		} else {
+			$dbhname = $this->lookup_dbhs_name( $dbhname_or_dbh );
+		}
+
+		// Set last used for this dbh
+		if ( empty( $dbhname ) ) {
+			return;
+		}
+
+		if ( ! isset( $this->dbhname_heartbeats[ $dbhname ] ) ) {
+			$this->dbhname_heartbeats[ $dbhname ] = array();
+		}
+
+		$this->dbhname_heartbeats[ $dbhname ]['last_used'] = microtime( true );
 	}
 
 	/**
