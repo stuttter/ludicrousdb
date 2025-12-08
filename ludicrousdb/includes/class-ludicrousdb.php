@@ -2311,7 +2311,7 @@ class LudicrousDB extends wpdb {
 	 * @param  int    $port Port or socket.
 	 * @param  float  $float_timeout Timeout in seconds, as float number ().
 	 *
-	 * @return bool true when $host:$post responds within $float_timeout seconds, else false
+	 * @return bool true when $host:$port responds within $float_timeout seconds, else false
 	 */
 	public function check_tcp_responsiveness( $host, $port, $float_timeout ) {
 		$socket = '';
