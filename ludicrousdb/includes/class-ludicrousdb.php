@@ -2314,7 +2314,7 @@ class LudicrousDB extends wpdb {
 	 * @return bool true when $host:$post responds within $float_timeout seconds, else false
 	 */
 	public function check_tcp_responsiveness( $host, $port, $float_timeout ) {
-$socket = '';
+		$socket = '';
 
     // Bail if disabled
 		if ( empty( $this->check_tcp_responsiveness ) ) {
