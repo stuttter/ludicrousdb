@@ -6,12 +6,12 @@
  * Author:            Triple J Software, Inc.
  * License:           GPL v2 or later
  * Plugin URI:        https://github.com/stuttter/ludicrousdb
- * Author URI:        https://jjj.software
+ * Author URI:        https://github.com/stuttter/ludicrousdb/graphs/contributors
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       ludicrousdb
  * Requires PHP:      7.4
  * Requires at least: 5.0
- * Version:           5.2.0
+ * Version:           5.3.0
  */
 
 // Exit if accessed directly

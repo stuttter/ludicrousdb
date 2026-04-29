@@ -9,7 +9,7 @@ Tags:              database, mysql, performance, scaling, wpdb
 Requires PHP:      7.0
 Requires at least: 5.0
 Tested up to:      6.5
-Stable tag:        5.2.0
+Stable tag:        5.3.0
 
 LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
 
@@ -81,6 +81,16 @@ One way LudicrousDB differs from WPDB is that LudicrousDB does not attempt to co
 Since LudicrousDB attempts a connection only when a query is made, your WordPress installation will not kill the site with a database error, but will let the code decide what to do next on an unsuccessful query. If you want to do something different, like setting a custom error page or kill the site, you need to define the 'db_connection_error' callback in your db-config.php.
 
 == Changelog ==
+
+= 5.3.0 =
+* Fix unnecessary pings and add retry queries
+* Fix that if check_tcp_responsiveness is disabled, time is wasted by looping over all possible servers while the last one is used instead of the first possible one
+* Fix PHP 8.4 mysqli_ping deprecation and error code change
+* Fix PHP 8.2+ dynamic property deprecation warnings
+* Fix backward compatibility for renamed class variables in 5.2.0
+* Replace deprecated mysqli_ping() with mysqli_errno() checks for PHP 8.4 compatibility
+* Remove wrong duplicate escape
+* Prevent "SELECT FOUND_ROWS" possibly returning an unrelated result
 
 = 5.2.0 =
 * PHP 8.3 compatibility
