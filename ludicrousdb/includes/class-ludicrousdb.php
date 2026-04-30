@@ -384,6 +384,9 @@ class LudicrousDB extends wpdb {
 
 		// Prepare class vars
 		$this->prepare_class_vars( $dbuser, $dbpassword, $dbname, $dbhost );
+
+		// Initialize charset and collate
+		$this->init_charset();
 	}
 
 	/**
@@ -1570,9 +1573,9 @@ class LudicrousDB extends wpdb {
 			$collate = $this->collate;
 		}
 
-		// Exit if charset or collation are empty
-		if ( empty( $charset ) || empty( $collate ) ) {
-			wp_die( "{$charset}  {$collate}" );
+		// Exit if charset is empty
+		if ( empty( $charset ) ) {
+			return;
 		}
 
 		// Exit if charset is not allowed
