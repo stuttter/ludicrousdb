@@ -96,6 +96,115 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Current and historical select arguments fail safely without a handle.
+	 */
+	public function test_select_argument_compatibility_without_a_connection() {
+		$database = new LudicrousDB();
+
+		$this->assertFalse( $database->select( DB_NAME ) );
+		$this->assertFalse(
+			call_user_func_array(
+				array( $database, 'select' ),
+				array(
+					'db'           => DB_NAME,
+					'dbh'          => null,
+					'dbh_or_table' => false,
+				)
+			)
+		);
+	}
+
+	/**
+	 * Current db_connect arguments reach wpdb without changing the query.
+	 */
+	public function test_db_connect_supports_current_calling_convention() {
+		$database = new LudicrousDB();
+
+		$this->assertFalse( $database->db_connect( false, 'SELECT * FROM wp_posts' ) );
+		$this->assertSame( array( false ), $database->db_connect_calls );
+		$this->assertSame( 'wp_posts', $database->last_table );
+	}
+
+	/**
+	 * A query in the first argument retains LudicrousDB's historical behavior.
+	 */
+	public function test_db_connect_supports_historical_query_argument() {
+		$database                    = new LudicrousDB();
+		$database->die_on_disconnect = true;
+
+		$this->assertFalse( $database->db_connect( 'SELECT * FROM wp_users' ) );
+		$this->assertSame( array( true ), $database->db_connect_calls );
+		$this->assertSame( 'wp_users', $database->last_table );
+	}
+
+	/**
+	 * A connection requested before a query exists uses a harmless probe query.
+	 */
+	public function test_db_connect_without_query_uses_no_table_fallback() {
+		$database = new LudicrousDB();
+
+		$this->assertFalse( $database->db_connect( false ) );
+		$this->assertSame( 'no-table', $database->last_table );
+	}
+
+	/**
+	 * Callers can suppress a fatal error when routing cannot select a dataset.
+	 */
+	public function test_db_connect_honors_allow_bail() {
+		$database = new LudicrousDB();
+		$database->add_callback(
+			function () {
+				return '';
+			}
+		);
+
+		$this->assertFalse( $database->db_connect( false, 'SELECT * FROM wp_posts' ) );
+		$this->assertSame( array(), $database->bail_calls );
+
+		$this->assertFalse( $database->db_connect( true, 'SELECT * FROM wp_posts' ) );
+		$this->assertCount( 1, $database->bail_calls );
+		$this->assertStringContainsString( 'Unable to determine which dataset', $database->bail_calls[0][0] );
+	}
+
+	/**
+	 * Current and historical reconnect flags both suppress fatal handling.
+	 */
+	public function test_check_connection_argument_compatibility() {
+		$database                    = new LudicrousDB();
+		$database->reconnect_retries = 0;
+
+		$this->assertFalse( $database->check_connection( false ) );
+		$this->assertFalse(
+			call_user_func_array(
+				array( $database, 'check_connection' ),
+				array(
+					'allow_bail'        => true,
+					'dbh_or_table'      => false,
+					'query'             => 'SELECT 1',
+					'die_on_disconnect' => false,
+				)
+			)
+		);
+	}
+
+	/**
+	 * Fractional reconnect delays are measured in seconds, not truncated.
+	 */
+	public function test_check_connection_honors_fractional_reconnect_sleep() {
+		$database                    = new LudicrousDB();
+		$database->reconnect_retries = 2;
+		$database->reconnect_sleep   = 0.02;
+		$start                       = microtime( true );
+
+		$this->assertFalse( $database->check_connection( false ) );
+
+		$elapsed = microtime( true ) - $start;
+		$this->assertGreaterThanOrEqual( 0.03, $elapsed );
+		$this->assertLessThan( 1.0, $elapsed );
+		$this->assertSame( array( false, false ), $database->db_connect_calls );
+	}
+
+	/**
 	 * Identifier placeholders track the installed wpdb implementation.
 	 */
 	public function test_identifier_placeholder_capability_comes_from_wpdb() {
@@ -223,6 +332,54 @@ final class LudicrousDBTest extends TestCase {
 		$this->assertTrue(
 			$database->check_tcp_responsiveness( 'localhost:/does/not/exist.sock', 3306, 0.01 )
 		);
+	}
+
+	/**
+	 * Unix socket endpoints are probed with their native socket path.
+	 */
+	public function test_tcp_responsiveness_supports_unix_sockets() {
+		$socket_path = '/tmp/ldb-' . uniqid() . '.sock';
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- Unsupported socket types must skip cleanly.
+		$server = @stream_socket_server( 'unix://' . $socket_path, $errno, $errstr );
+
+		if ( false === $server ) {
+			$this->markTestSkipped( "Unable to create a Unix socket: {$errstr} ({$errno})" );
+		}
+
+		try {
+			$database = new LudicrousDB();
+			$this->assertTrue( $database->check_tcp_responsiveness( 'localhost', 3306, 0.1, $socket_path ) );
+		} finally {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- This is a socket resource.
+			fclose( $server );
+			if ( file_exists( $socket_path ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- Remove the test's temporary socket only.
+				unlink( $socket_path );
+			}
+		}
+	}
+
+	/**
+	 * IPv6 endpoints retain their address when opened as TCP sockets.
+	 */
+	public function test_tcp_responsiveness_supports_ipv6() {
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- IPv6 can be unavailable in supported environments.
+		$server = @stream_socket_server( 'tcp://[::1]:0', $errno, $errstr );
+
+		if ( false === $server ) {
+			$this->markTestSkipped( "IPv6 loopback is unavailable: {$errstr} ({$errno})" );
+		}
+
+		try {
+			$address  = stream_socket_get_name( $server, false );
+			$port     = (int) substr( $address, strrpos( $address, ':' ) + 1 );
+			$database = new LudicrousDB();
+
+			$this->assertTrue( $database->check_tcp_responsiveness( '[::1]', $port, 0.1 ) );
+		} finally {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- This is a socket resource.
+			fclose( $server );
+		}
 	}
 
 	/**

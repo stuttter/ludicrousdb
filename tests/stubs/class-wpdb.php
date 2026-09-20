@@ -56,6 +56,20 @@ class wpdb {
 	public $show_errors = false;
 
 	/**
+	 * Calls made to the inherited connection fallback.
+	 *
+	 * @var array
+	 */
+	public $db_connect_calls = array();
+
+	/**
+	 * Messages passed to bail().
+	 *
+	 * @var array
+	 */
+	public $bail_calls = array();
+
+	/**
 	 * Compatibility properties handled by wpdb magic methods.
 	 *
 	 * @var array
@@ -95,6 +109,46 @@ class wpdb {
 	 */
 	public function show_errors( $show = true ) {
 		$this->show_errors = $show;
+	}
+
+	/**
+	 * Record calls to the wpdb connection fallback.
+	 *
+	 * @param bool $allow_bail Whether the caller allows a fatal error.
+	 * @return bool
+	 */
+	public function db_connect( $allow_bail = true ) {
+		$this->db_connect_calls[] = $allow_bail;
+		$this->dbh                = false;
+
+		return false;
+	}
+
+	/**
+	 * Record database error handling without terminating the test process.
+	 *
+	 * @param string $message Error message.
+	 * @param string $error_code Optional error code.
+	 * @return false
+	 */
+	public function bail( $message, $error_code = '500' ) {
+		$this->bail_calls[] = array( $message, $error_code );
+
+		return false;
+	}
+
+	/**
+	 * Extract the first WordPress-style table name from a query.
+	 *
+	 * @param string $query SQL query.
+	 * @return string|null
+	 */
+	public function get_table_from_query( $query ) {
+		$matches = array();
+
+		return preg_match( '/\\b(wp_[a-z0-9_]+)\\b/i', $query, $matches )
+			? $matches[1]
+			: null;
 	}
 
 	/**
