@@ -43,12 +43,6 @@ parameters:
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
 		-
-			message: '#^Access to an undefined property LudicrousDB\:\:\$time_start\.$#'
-			identifier: property.notFound
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
 			message: '#^Call to function is_array\(\) with \*NEVER\* will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
@@ -105,18 +99,6 @@ parameters:
 		-
 			message: '#^Default value of the parameter \#1 \$dbh \(false\) of method LudicrousDB\:\:lookup_dbhs_name\(\) is incompatible with type object\.$#'
 			identifier: parameter.defaultValue
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Function apply_filters invoked with 3 parameters, 2 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Function apply_filters invoked with 6 parameters, 2 required\.$#'
-			identifier: arguments.count
 			count: 1
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
@@ -333,12 +315,6 @@ parameters:
 		-
 			message: '#^PHPDoc tag @param has invalid value \(string      null   The filtered return value\. Default is null\.\)\: Unexpected token "null", expected variable at offset 586 on line 15$#'
 			identifier: phpDoc.parseError
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^PHPDoc type mysqli\|resource\|false\|null of property LudicrousDB\:\:\$dbh is not covariant with PHPDoc type string of overridden property wpdb\:\:\$dbh\.$#'
-			identifier: property.phpDocType
 			count: 1
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
