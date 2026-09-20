@@ -113,7 +113,8 @@ write         (optional) Whether server is writable. Default is 1 (writable).
 dataset       (optional) Name of dataset. Default is 'global'.
 timeout       (optional) Seconds to wait for TCP responsiveness. Default is 0.2
 lag_threshold (optional) The minimum lag on a replica in seconds before we consider it lagged.
-                         Set null to disable. When not set, the value of $wpdb->default_lag_threshold is used.
+                         Set null to disable. When not set, the value of
+                         $wpdb->database_defaults['lag_threshold'] is used.
 ```
 
 #### add_table()
