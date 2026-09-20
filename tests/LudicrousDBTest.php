@@ -105,6 +105,95 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Database hosts are normalized without losing ports, sockets, or IPv6.
+	 *
+	 * @param string $host     Configured host.
+	 * @param int    $port     Separately configured port.
+	 * @param array  $expected Expected normalized values.
+	 *
+	 * @dataProvider database_host_provider
+	 */
+	public function test_database_host_normalization( $host, $port, $expected ) {
+		$database = new LudicrousDBTestDouble();
+
+		$this->assertSame( $expected, $database->parse_database_host_for_test( $host, $port ) );
+	}
+
+	/**
+	 * Representative TCP, socket, and IPv6 host formats.
+	 *
+	 * @return array
+	 */
+	public function database_host_provider() {
+		return array(
+			'separate port'       => array(
+				'database.example.test',
+				3307,
+				array( 'database.example.test', 3307, '', false ),
+			),
+			'embedded port'       => array(
+				'database.example.test:3308',
+				3307,
+				array( 'database.example.test', 3308, '', false ),
+			),
+			'socket'              => array(
+				'localhost:/var/run/mysql/mysql.sock',
+				3307,
+				array( 'localhost', 3307, '/var/run/mysql/mysql.sock', false ),
+			),
+			'port and socket'     => array(
+				'localhost:3308:/var/run/mysql/mysql.sock',
+				3307,
+				array( 'localhost', 3308, '/var/run/mysql/mysql.sock', false ),
+			),
+			'socket without host' => array(
+				':/var/run/mysql/mysql.sock',
+				3307,
+				array( '', 3307, '/var/run/mysql/mysql.sock', false ),
+			),
+			'IPv6'                => array(
+				'[::1]:3308',
+				3307,
+				array( '::1', 3308, '', true ),
+			),
+			'IPv6 with socket'    => array(
+				'[::1]:3308:/var/run/mysql/mysql.sock',
+				3307,
+				array( '::1', 3308, '/var/run/mysql/mysql.sock', true ),
+			),
+		);
+	}
+
+	/**
+	 * Socket paths are part of health-check cache identity.
+	 */
+	public function test_socket_cache_keys_do_not_collide() {
+		$database  = new LudicrousDBTestDouble();
+		$cache_key = $database->tcp_cache_key_for_test( 'localhost', 3306, '/run/mysql-a.sock' );
+
+		$this->assertNotSame(
+			$cache_key,
+			$database->tcp_cache_key_for_test( 'localhost', 3306, '/run/mysql-b.sock' )
+		);
+		$this->assertSame(
+			array( 'localhost', 3306, '/run/mysql-a.sock', false ),
+			$database->parse_database_host_for_test( $cache_key, 0 )
+		);
+	}
+
+	/**
+	 * Disabling health checks also bypasses socket probes.
+	 */
+	public function test_disabled_tcp_responsiveness_skips_socket_probe() {
+		$database                           = new LudicrousDB();
+		$database->check_tcp_responsiveness = false;
+
+		$this->assertTrue(
+			$database->check_tcp_responsiveness( 'localhost:/does/not/exist.sock', 3306, 0.01 )
+		);
+	}
+
+	/**
 	 * Server definitions retain their configured priority groups.
 	 */
 	public function test_database_configuration_preserves_read_and_write_priorities() {

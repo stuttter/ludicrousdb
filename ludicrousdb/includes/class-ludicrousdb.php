@@ -1069,15 +1069,8 @@ class LudicrousDB extends wpdb {
 					$server = array();
 				}
 
-				// Maybe split host:port into $host and $port
-				if ( strpos( $host, ':' ) ) {
-					list( $host, $port ) = explode( ':', $host );
-				}
-
-				// Maybe use the default port number (usually: 3306)
-				if ( empty( $port ) ) {
-					$port = (int) $this->database_defaults['port'];
-				}
+				// Normalize host, port, and socket using wpdb's canonical parser.
+				list( $host, $port, $socket ) = $this->parse_database_host( $host, $port );
 
 				// Maybe use the default timeout (usually: 200ms)
 				if ( ! isset( $timeout ) ) {
@@ -1090,7 +1083,7 @@ class LudicrousDB extends wpdb {
 				}
 
 				// Format the cache key using the extracted host and port
-				$host_and_port = $this->tcp_get_cache_key( $host, $port );
+				$host_and_port = $this->tcp_get_cache_key( $host, $port, $socket );
 
 				// Can be used by the lag callbacks
 				$this->lag_cache_key = $host_and_port;
@@ -1134,7 +1127,7 @@ class LudicrousDB extends wpdb {
 
 				$this->timer_start();
 
-				$tcp = $this->check_tcp_responsiveness( $host, $port, $timeout );
+				$tcp = $this->check_tcp_responsiveness( $host, $port, $timeout, $socket );
 
 				// Connect if necessary or possible
 				if (
@@ -1202,7 +1195,7 @@ class LudicrousDB extends wpdb {
 							$queries = isset( $queries ) ? $queries : 1; // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
 							$lag     = isset( $this->lag ) ? $this->lag : 0;
 
-							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
+							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'socket', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
 							$this->db_connections[]   = $this->last_connection;
 							$this->open_connections[] = $dbhname;
 							$success                  = true;
@@ -1213,7 +1206,7 @@ class LudicrousDB extends wpdb {
 				}
 
 				$success                = false;
-				$this->last_connection  = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success' );
+				$this->last_connection  = compact( 'dbhname', 'host', 'port', 'socket', 'user', 'name', 'tcp', 'elapsed', 'success' );
 				$this->db_connections[] = $this->last_connection;
 
 				if ( $this->dbh_type_check( $this->dbhs[ $dbhname ] ) ) {
@@ -1341,12 +1334,48 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
+	 * Normalize a database host while preserving the separately configured port.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param string $host Database host, optionally including a port or socket.
+	 * @param int    $port Separately configured port.
+	 * @return array{0: string, 1: int, 2: string, 3: bool} Host, port, socket, and IPv6 flag.
+	 */
+	protected function parse_database_host( $host, $port = 0 ) {
+		$host_data = $this->parse_db_host( $host );
+
+		if ( false === $host_data ) {
+			if ( empty( $port ) ) {
+				$port = (int) $this->database_defaults['port'];
+			}
+
+			return array( $host, (int) $port, '', false );
+		}
+
+		list( $host, $parsed_port, $socket, $is_ipv6 ) = $host_data;
+
+		if ( null !== $parsed_port ) {
+			$port = $parsed_port;
+		} elseif ( empty( $port ) ) {
+			$port = (int) $this->database_defaults['port'];
+		}
+
+		return array(
+			$host,
+			(int) $port,
+			null === $socket ? '' : $socket,
+			$is_ipv6,
+		);
+	}
+
+	/**
 	 * Connect selected database
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $dbhname Database name.
-	 * @param string $host Internet address: host:port of server on internet.
+	 * @param string $dbhname Database handle name.
+	 * @param string $host Internet address, including a port and optional socket.
 	 * @param string $user Database user.
 	 * @param string $password Database password.
 	 *
@@ -1362,6 +1391,8 @@ class LudicrousDB extends wpdb {
 		$tcp_cache_key  = $host;
 		$this->is_mysql = true;
 
+		list( $host, $port, $socket, $is_ipv6 ) = $this->parse_database_host( $host );
+
 		// Check client flags
 		$client_flags = defined( 'MYSQL_CLIENT_FLAGS' )
 			? MYSQL_CLIENT_FLAGS
@@ -1369,31 +1400,6 @@ class LudicrousDB extends wpdb {
 
 		// Initialize the database handle
 		$this->dbhs[ $dbhname ] = mysqli_init();
-
-		/**
-		 * mysqli_real_connect doesn't support the "host" param including a port
-		 * or socket like mysql_connect does. This duplicates how mysql_connect
-		 * detects a port and/or socket file.
-		 */
-		$port           = 0;
-		$socket         = '';
-		$port_or_socket = strstr( $host, ':' );
-
-		if ( ! empty( $port_or_socket ) ) {
-			$host           = substr( $host, 0, strpos( $host, ':' ) );
-			$port_or_socket = substr( $port_or_socket, 1 );
-
-			if ( 0 !== strpos( $port_or_socket, '/' ) ) {
-				$port         = intval( $port_or_socket );
-				$maybe_socket = strstr( $port_or_socket, ':' );
-
-				if ( ! empty( $maybe_socket ) ) {
-					$socket = substr( $maybe_socket, 1 );
-				}
-			} else {
-				$socket = $port_or_socket;
-			}
-		}
 
 		/**
 		 * If DB_HOST begins with a 'p:', allow it to be passed to
@@ -1408,6 +1414,11 @@ class LudicrousDB extends wpdb {
 			$pre_host = 'p:';
 		} else {
 			$pre_host = '';
+		}
+
+		// mysqlnd requires brackets around IPv6 addresses.
+		if ( $is_ipv6 && extension_loaded( 'mysqlnd' ) ) {
+			$host = "[{$host}]";
 		}
 
 		// Connect to the database
@@ -2432,16 +2443,30 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param  string $host Host.
-	 * @param  int    $port Port or socket.
-	 * @param  float  $float_timeout Timeout in seconds, as float number ().
+	 * @param string $host          Host.
+	 * @param int    $port          Port.
+	 * @param float  $float_timeout Timeout in seconds.
+	 * @param string $socket        Optional. Unix socket path.
 	 *
-	 * @return bool true when $host:$post responds within $float_timeout seconds, else false
+	 * @return bool True when the database endpoint responds within the timeout, otherwise false.
 	 */
-	public function check_tcp_responsiveness( $host, $port, $float_timeout ) {
+	public function check_tcp_responsiveness( $host, $port, $float_timeout, $socket = '' ) {
+
+		// Honor raw host strings passed by integrations calling this method directly.
+		list( $host, $port, $parsed_socket, $is_ipv6 ) = $this->parse_database_host( $host, $port );
+
+		if ( empty( $socket ) ) {
+			$socket = $parsed_socket;
+		}
+
+		if ( empty( $this->check_tcp_responsiveness ) ) {
+			$this->tcp_responsive = true;
+
+			return true;
+		}
 
 		// Get the cache key
-		$cache_key = $this->tcp_get_cache_key( $host, $port );
+		$cache_key = $this->tcp_get_cache_key( $host, $port, $socket );
 
 		// Persistent cached value exists
 		$cached_value = $this->tcp_cache_get( $cache_key );
@@ -2457,24 +2482,23 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		if ( empty( $this->check_tcp_responsiveness ) ) {
-			$this->tcp_responsive = true;
-			return true;
-		}
-
 		// Defaults
 		$errno  = 0;
 		$errstr = '';
+		$target = empty( $socket )
+			? ( $is_ipv6 ? "tcp://[{$host}]" : $host )
+			: 'unix://' . $socket;
+		$port   = empty( $socket ) ? $port : -1;
 
 		// Try to get a new socket
 		// phpcs:disable
-		$socket = $this->is_debug()
-			? fsockopen( $host, $port, $errno, $errstr, $float_timeout )
-			: @fsockopen( $host, $port, $errno, $errstr, $float_timeout );
+		$connection = $this->is_debug()
+			? fsockopen( $target, $port, $errno, $errstr, $float_timeout )
+			: @fsockopen( $target, $port, $errno, $errstr, $float_timeout );
 		// phpcs:enable
 
 		// No socket
-		if ( false === $socket ) {
+		if ( false === $connection ) {
 			$this->tcp_cache_set( $cache_key, 'down' );
 			$this->tcp_responsive = false;
 
@@ -2483,7 +2507,7 @@ class LudicrousDB extends wpdb {
 
 		// Close the socket
 		// phpcs:ignore
-		fclose( $socket );
+		fclose( $connection );
 
 		// Using API
 		$this->tcp_cache_set( $cache_key, 'up' );
@@ -2819,13 +2843,17 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 3.0.0
 	 *
-	 * @param string $host Host
-	 * @param string $port Port or socket.
+	 * @param string     $host   Host.
+	 * @param int|string $port   Port.
+	 * @param string     $socket Optional. Unix socket path.
 	 *
 	 * @return string
 	 */
-	protected function tcp_get_cache_key( $host, $port ) {
-		return "{$host}:{$port}";
+	protected function tcp_get_cache_key( $host, $port, $socket = '' ) {
+		$host = substr_count( $host, ':' ) > 1 ? "[{$host}]" : $host;
+		$key  = "{$host}:{$port}";
+
+		return empty( $socket ) ? $key : "{$key}:{$socket}";
 	}
 
 	/**

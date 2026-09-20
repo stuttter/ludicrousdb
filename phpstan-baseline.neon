@@ -361,12 +361,6 @@ parameters:
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
 		-
-			message: '#^Parameter \#2 \$port of method LudicrousDB\:\:tcp_get_cache_key\(\) expects string, int given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
 			message: '#^Parameter \$callback of method LudicrousDB\:\:add_callback\(\) has invalid type function\.$#'
 			identifier: class.notFound
 			count: 1

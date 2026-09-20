@@ -120,4 +120,38 @@ class wpdb {
 	public function has_cap( $db_cap ) {
 		return 'identifier_placeholders' === $db_cap;
 	}
+
+	/**
+	 * Parse a database host like WordPress 4.9 and later.
+	 *
+	 * @param string $host Database host.
+	 * @return array|false
+	 */
+	public function parse_db_host( $host ) {
+		$socket  = null;
+		$is_ipv6 = false;
+
+		$socket_pos = strpos( $host, ':/' );
+		if ( false !== $socket_pos ) {
+			$socket = substr( $host, $socket_pos + 1 );
+			$host   = substr( $host, 0, $socket_pos );
+		}
+
+		if ( substr_count( $host, ':' ) > 1 ) {
+			$pattern = '#^(?:\[)?(?P<host>[0-9a-fA-F:]+)(?:\]:(?P<port>[\d]+))?#';
+			$is_ipv6 = true;
+		} else {
+			$pattern = '#^(?P<host>[^:/]*)(?::(?P<port>[\d]+))?#';
+		}
+
+		$matches = array();
+		if ( 1 !== preg_match( $pattern, $host, $matches ) ) {
+			return false;
+		}
+
+		$host = ! empty( $matches['host'] ) ? $matches['host'] : '';
+		$port = ! empty( $matches['port'] ) ? (int) $matches['port'] : null;
+
+		return array( $host, $port, $socket, $is_ipv6 );
+	}
 }
