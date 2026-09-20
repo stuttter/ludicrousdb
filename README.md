@@ -2,6 +2,10 @@
 
 LudicrousDB is an advanced database interface for WordPress that supports replication, failover, load balancing, and partitioning, based on Automattic's HyperDB drop-in.
 
+LudicrousDB began as a distribution of HyperDB and intentionally retains it as
+an upstream compatibility source. See [HyperDB upstream parity](UPSTREAM.md)
+for the audited baseline and the rules used to review later HyperDB changes.
+
 ## 0. Installation
 
 ### Files

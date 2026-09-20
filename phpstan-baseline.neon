@@ -87,19 +87,13 @@ parameters:
 		-
 			message: '#^Constant DB_SERVER_GONE_ERROR not found\.$#'
 			identifier: constant.notFound
-			count: 4
+			count: 3
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
 		-
 			message: '#^Constant DB_SERVER_LOST_ERROR not found\.$#'
 			identifier: constant.notFound
-			count: 4
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Default value of the parameter \#1 \$dbh \(false\) of method LudicrousDB\:\:lookup_dbhs_name\(\) is incompatible with type object\.$#'
-			identifier: parameter.defaultValue
-			count: 1
+			count: 3
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
 		-
@@ -201,12 +195,6 @@ parameters:
 		-
 			message: '#^Method LudicrousDB\:\:log_query\(\) has parameter \$query_data with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Method LudicrousDB\:\:lookup_dbhs_name\(\) should return string but returns false\.$#'
-			identifier: return.type
 			count: 1
 			path: ludicrousdb/includes/class-ludicrousdb.php
 

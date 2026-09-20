@@ -214,6 +214,92 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Connection checks actively verify a handle instead of trusting stale state.
+	 */
+	public function test_check_connection_uses_an_active_probe() {
+		$database                          = new LudicrousDBTestDouble();
+		$database->connection_probe_result = true;
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is required for a deterministic liveness test.
+		$database->dbh = mysqli_init();
+
+		$database->dbhs['global__r'] = $database->dbh;
+
+		$this->assertTrue( $database->check_connection( false, $database->dbh ) );
+		$this->assertSame( array( 'probe' ), $database->connection_events );
+	}
+
+	/**
+	 * A failed probe removes the stale handle before attempting reconnection.
+	 */
+	public function test_check_connection_disconnects_before_reconnecting() {
+		$database                          = new LudicrousDBTestDouble();
+		$database->connection_probe_result = false;
+		$database->reconnect_retries       = 1;
+		$database->reconnect_sleep         = 0;
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is required for a deterministic liveness test.
+		$database->dbh = mysqli_init();
+
+		$database->dbhs['global__r'] = $database->dbh;
+
+		$this->assertFalse( $database->check_connection( false, $database->dbh, 'SELECT * FROM wp_posts' ) );
+		$this->assertSame( array( 'probe', 'disconnect', 'reconnect' ), $database->connection_events );
+		$this->assertArrayNotHasKey( 'global__r', $database->dbhs );
+	}
+
+	/**
+	 * The real probe rejects an initialized handle that is not connected.
+	 */
+	public function test_connection_probe_rejects_an_unconnected_handle() {
+		$database = new LudicrousDBTestDouble();
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle exercises the real failure path without a server dependency.
+		$dbh = mysqli_init();
+
+		$this->assertFalse( $database->is_connection_alive_for_test( $dbh ) );
+	}
+
+	/**
+	 * Disconnecting one routing name removes every alias of the same handle.
+	 */
+	public function test_disconnect_removes_aliased_handles_and_is_idempotent() {
+		$database = new LudicrousDBTestDouble();
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is sufficient because the test double records close attempts.
+		$dbh = mysqli_init();
+
+		$database->dbh                = $dbh;
+		$database->dbhs['global__r']  = $dbh;
+		$database->dbhs['global__w']  = $dbh;
+		$database->open_connections[] = 'global__r';
+		$database->open_connections[] = 'global__w';
+
+		$database->disconnect( 'global__r' );
+		$database->disconnect( 'global__r' );
+
+		$this->assertNull( $database->dbh );
+		$this->assertSame( array(), $database->dbhs );
+		$this->assertSame( array(), array_values( $database->open_connections ) );
+		$this->assertSame( 1, $database->close_calls );
+	}
+
+	/**
+	 * Disconnecting a failed scalar entry does not evict unrelated failures.
+	 */
+	public function test_disconnect_does_not_alias_scalar_failure_entries() {
+		$database                     = new LudicrousDBTestDouble();
+		$database->dbhs['first__r']   = false;
+		$database->dbhs['second__r']  = false;
+		$database->open_connections[] = 'first__r';
+		$database->open_connections[] = 'already-removed__r';
+
+		$database->disconnect( 'first__r' );
+		$database->disconnect( 'already-removed__r' );
+
+		$this->assertArrayNotHasKey( 'first__r', $database->dbhs );
+		$this->assertArrayHasKey( 'second__r', $database->dbhs );
+		$this->assertSame( array(), array_values( $database->open_connections ) );
+		$this->assertSame( 0, $database->close_calls );
+	}
+
+	/**
 	 * Identifier placeholders track the installed wpdb implementation.
 	 */
 	public function test_identifier_placeholder_capability_comes_from_wpdb() {
