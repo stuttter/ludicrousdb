@@ -129,8 +129,7 @@ final class LudicrousDBTest extends TestCase {
 	 * A query in the first argument retains LudicrousDB's historical behavior.
 	 */
 	public function test_db_connect_supports_historical_query_argument() {
-		$database                    = new LudicrousDB();
-		$database->die_on_disconnect = true;
+		$database = new LudicrousDB();
 
 		$this->assertFalse( $database->db_connect( 'SELECT * FROM wp_users' ) );
 		$this->assertSame( array( true ), $database->db_connect_calls );

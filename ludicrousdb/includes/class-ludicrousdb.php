@@ -760,7 +760,7 @@ class LudicrousDB extends wpdb {
 		// Preserve the historical db_connect( $query ) calling convention.
 		if ( is_string( $allow_bail ) && '' === $query ) {
 			$query      = $allow_bail;
-			$allow_bail = $this->die_on_disconnect;
+			$allow_bail = true;
 		}
 
 		// Core may call db_connect() before a query is available.
