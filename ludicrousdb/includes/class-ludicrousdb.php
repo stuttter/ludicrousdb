@@ -1674,17 +1674,33 @@ class LudicrousDB extends wpdb {
 	 * @param string $dbhname Database name.
 	 */
 	public function disconnect( $dbhname ) {
-		$key = array_search( $dbhname, $this->open_connections, true );
-
-		if ( $key !== false ) {
-			unset( $this->open_connections[ $key ] );
+		if ( ! isset( $this->dbhs[ $dbhname ] ) ) {
+			return;
 		}
 
-		if ( $this->dbh_type_check( $this->dbhs[ $dbhname ] ) ) {
-			$this->close( $this->dbhs[ $dbhname ] );
+		$dbh = $this->dbhs[ $dbhname ];
+
+		// A single connection can be cached under more than one routing name.
+		foreach ( $this->dbhs as $other_dbhname => $other_dbh ) {
+			if ( $dbh !== $other_dbh ) {
+				continue;
+			}
+
+			$key = array_search( $other_dbhname, $this->open_connections, true );
+			if ( false !== $key ) {
+				unset( $this->open_connections[ $key ] );
+			}
+
+			unset( $this->dbhs[ $other_dbhname ] );
 		}
 
-		unset( $this->dbhs[ $dbhname ] );
+		if ( $this->dbh === $dbh ) {
+			$this->dbh = null;
+		}
+
+		if ( $this->dbh_type_check( $dbh ) ) {
+			$this->close( $dbh );
+		}
 	}
 
 	/**
@@ -1741,6 +1757,9 @@ class LudicrousDB extends wpdb {
 			$dbhname = $this->lookup_dbhs_name( $dbh );
 			if ( false !== $dbhname ) {
 				$this->disconnect( $dbhname );
+			} elseif ( $this->dbh === $dbh ) {
+				$this->dbh = null;
+				$this->close( $dbh );
 			}
 		}
 

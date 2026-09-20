@@ -19,6 +19,13 @@ class LudicrousDBTestDouble extends LudicrousDB {
 	public $connection_events = array();
 
 	/**
+	 * Number of close attempts made by connection-cleanup tests.
+	 *
+	 * @var int
+	 */
+	public $close_calls = 0;
+
+	/**
 	 * Expose host normalization.
 	 *
 	 * @param string $host Database host.
@@ -58,6 +65,16 @@ class LudicrousDBTestDouble extends LudicrousDB {
 	}
 
 	/**
+	 * Exercise the real connection probe from tests.
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return bool Whether the connection responded.
+	 */
+	public function is_connection_alive_for_test( $dbh ) {
+		return parent::is_connection_alive( $dbh );
+	}
+
+	/**
 	 * Record stale-handle removal without closing the test handle.
 	 *
 	 * @param string $dbhname Database handle name.
@@ -71,6 +88,18 @@ class LudicrousDBTestDouble extends LudicrousDB {
 		}
 
 		parent::disconnect( $dbhname );
+	}
+
+	/**
+	 * Record close attempts without calling mysqli_close() on inert test handles.
+	 *
+	 * @param false|string|mysqli|resource $dbh_or_table Database handle or table name.
+	 * @return bool True when the close attempt was recorded.
+	 */
+	public function close( $dbh_or_table = false ) { // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- The override intentionally records the call without closing the supplied handle.
+		++$this->close_calls;
+
+		return true;
 	}
 
 	/**

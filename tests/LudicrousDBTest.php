@@ -247,6 +247,40 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * The real probe rejects an initialized handle that is not connected.
+	 */
+	public function test_connection_probe_rejects_an_unconnected_handle() {
+		$database = new LudicrousDBTestDouble();
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle exercises the real failure path without a server dependency.
+		$dbh = mysqli_init();
+
+		$this->assertFalse( $database->is_connection_alive_for_test( $dbh ) );
+	}
+
+	/**
+	 * Disconnecting one routing name removes every alias of the same handle.
+	 */
+	public function test_disconnect_removes_aliased_handles_and_is_idempotent() {
+		$database = new LudicrousDBTestDouble();
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is sufficient because the test double records close attempts.
+		$dbh = mysqli_init();
+
+		$database->dbh                = $dbh;
+		$database->dbhs['global__r']  = $dbh;
+		$database->dbhs['global__w']  = $dbh;
+		$database->open_connections[] = 'global__r';
+		$database->open_connections[] = 'global__w';
+
+		$database->disconnect( 'global__r' );
+		$database->disconnect( 'global__r' );
+
+		$this->assertNull( $database->dbh );
+		$this->assertSame( array(), $database->dbhs );
+		$this->assertSame( array(), array_values( $database->open_connections ) );
+		$this->assertSame( 1, $database->close_calls );
+	}
+
+	/**
 	 * Identifier placeholders track the installed wpdb implementation.
 	 */
 	public function test_identifier_placeholder_capability_comes_from_wpdb() {
