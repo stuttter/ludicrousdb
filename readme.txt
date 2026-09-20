@@ -11,7 +11,7 @@ Requires at least: 6.4
 Tested up to:      7.1
 Stable tag:        5.3.0
 
-LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
+LudicrousDB is an advanced database interface for WordPress that supports replication, failover, load balancing, and partitioning.
 
 == Description ==
 
@@ -21,20 +21,20 @@ The main differences are:
 
 * Connects to an arbitrary number of database servers
 * Inspects each query to determine the appropriate database
-* Designed specifically for large, multi-site, high-availability environments
+* Designed specifically for large, multisite, high-availability environments
 
 It supports:
 
 * Read and write servers (replication)
 * Configurable priority for reading and writing
-* Local and remote data-centers
+* Local and remote data centers
 * Private and public networks
 * Different tables on different databases/hosts
 * Smart post-write primary reads
-* Fail-over for downed host
+* Failover for a downed host
 * Advanced statistics for profiling
 
-It is based on the code currently used in production on WordPress.com & WordPress.org, with many database servers spanning multiple data-centers.
+It is based on the code currently used in production on WordPress.com and WordPress.org, with many database servers spanning multiple data centers.
 
 It is a fork of Automattic's HyperDB.
 

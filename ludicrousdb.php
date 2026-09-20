@@ -2,7 +2,7 @@
 
 /**
  * Plugin Name:       LudicrousDB
- * Description:       An advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning.
+ * Description:       An advanced database interface for WordPress that supports replication, failover, load balancing, and partitioning.
  * Author:            Triple J Software, Inc.
  * License:           GPL v2 or later
  * Plugin URI:        https://github.com/stuttter/ludicrousdb
