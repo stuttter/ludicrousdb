@@ -258,6 +258,61 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * A closed mysqli object can be removed without closing it a second time.
+	 */
+	public function test_check_connection_safely_removes_a_closed_handle() {
+		$database                    = new LudicrousDB();
+		$database->reconnect_retries = 0;
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- A closed handle exercises the PHP 8 error path in mysqli_close().
+		$dbh = mysqli_init();
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_close -- Intentionally manufacture a stale handle for the cleanup test.
+		mysqli_close( $dbh );
+
+		$database->dbh                = $dbh;
+		$database->dbhs['global__r']  = $dbh;
+		$database->open_connections[] = 'global__r';
+
+		$this->assertFalse( $database->check_connection( false, $dbh ) );
+		$this->assertNull( $database->dbh );
+		$this->assertArrayNotHasKey( 'global__r', $database->dbhs );
+		$this->assertSame( array(), array_values( $database->open_connections ) );
+	}
+
+	/**
+	 * Closing a stale handle restores the previously installed error handler.
+	 */
+	public function test_closing_a_stale_handle_restores_the_previous_error_handler() {
+		$database        = new LudicrousDB();
+		$handled_warning = false;
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- A closed handle exercises the guarded mysqli_close() call.
+		$dbh = mysqli_init();
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_close -- Intentionally manufacture a stale handle for the cleanup test.
+		mysqli_close( $dbh );
+		$database->dbh = $dbh;
+
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- The sentinel verifies that close() restores its caller's handler.
+		set_error_handler(
+			static function () use ( &$handled_warning ) {
+				$handled_warning = true;
+				return true;
+			}
+		);
+
+		try {
+			$this->assertFalse( $database->close( $dbh ) );
+			$this->assertNull( $database->dbh );
+			$this->assertFalse( $handled_warning );
+			$handled_warning = false;
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_trigger_error -- Exercise the sentinel handler after close() returns.
+			trigger_error( 'LudicrousDB error-handler sentinel.', E_USER_WARNING );
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertTrue( $handled_warning );
+	}
+
+	/**
 	 * Disconnecting one routing name removes every alias of the same handle.
 	 */
 	public function test_disconnect_removes_aliased_handles_and_is_idempotent() {
