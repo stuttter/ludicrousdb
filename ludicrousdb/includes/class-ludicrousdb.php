@@ -19,6 +19,33 @@ defined( 'ABSPATH' ) || exit;
  */
 class LudicrousDB extends wpdb {
 	/**
+	 * Connection probe status: the handle cannot be reused.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @var int
+	 */
+	protected const CONNECTION_DEAD = 0;
+
+	/**
+	 * Connection probe status: the handle is immediately reusable.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @var int
+	 */
+	protected const CONNECTION_AVAILABLE = 1;
+
+	/**
+	 * Connection probe status: the handle is live but has pending results.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @var int
+	 */
+	protected const CONNECTION_BUSY = 2;
+
+	/**
 	 * MySQL client error for a command issued while results are still pending.
 	 *
 	 * @since 5.4.0
@@ -1796,13 +1823,16 @@ class LudicrousDB extends wpdb {
 
 		// Return true if connection is alive and immediately reusable. This is the most common case.
 		if ( $this->dbh_type_check( $dbh ) ) {
-			if ( $this->is_connection_alive( $dbh ) ) {
-				if ( ! $this->has_busy_connection_probe( $dbh ) ) {
-					$this->update_heartbeat( $dbh );
+			$connection_status = $this->get_connection_status( $dbh );
 
-					return true;
-				}
+			if ( self::CONNECTION_AVAILABLE === $connection_status ) {
+				$this->clear_busy_connection_probe( $dbh );
+				$this->update_heartbeat( $dbh );
 
+				return true;
+			}
+
+			if ( self::CONNECTION_BUSY === $connection_status ) {
 				// Preserve the active result while replacing the cached busy handle.
 				$this->preserve_busy_connection( $dbh );
 				$this->release_connection_aliases( $dbh );
@@ -1892,7 +1922,7 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Actively verify that a MySQL connection is usable.
+	 * Return the current usability status of a MySQL connection.
 	 *
 	 * The mysqli_ping() function is deprecated as of PHP 8.4. A harmless statement provides
 	 * the same liveness check without relying on the deprecated API or a stale
@@ -1901,29 +1931,60 @@ class LudicrousDB extends wpdb {
 	 * @since 5.4.0
 	 *
 	 * @param mysqli|resource $dbh Database connection.
-	 * @return bool Whether the connection responded.
+	 * @return int One of the CONNECTION_* status constants.
 	 */
-	protected function is_connection_alive( $dbh ) {
+	protected function get_connection_status( $dbh ) {
 		try {
 			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- A failed probe is handled as a reconnect signal.
 			$responded = false !== @mysqli_query( $dbh, 'DO 1' );
 
 			if ( $responded ) {
-				$this->clear_busy_connection_probe( $dbh );
-
-				return true;
+				return self::CONNECTION_AVAILABLE;
 			}
 
 			// An active unbuffered or multi-result query makes the handle busy, not dead.
 			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- A closed PHP 7.4 handle warns while reporting its error code.
-			return $this->handle_connection_probe_failure( $dbh, @mysqli_errno( $dbh ) );
+			return self::MYSQL_COMMANDS_OUT_OF_SYNC === (int) @mysqli_errno( $dbh )
+				? self::CONNECTION_BUSY
+				: self::CONNECTION_DEAD;
 		} catch ( mysqli_sql_exception $exception ) {
-			return $this->handle_connection_probe_failure( $dbh, $exception->getCode() );
+			return self::MYSQL_COMMANDS_OUT_OF_SYNC === (int) $exception->getCode()
+				? self::CONNECTION_BUSY
+				: self::CONNECTION_DEAD;
 		} catch ( Throwable $exception ) {
+			return self::CONNECTION_DEAD;
+		}
+	}
+
+	/**
+	 * Actively verify that a MySQL connection is alive.
+	 *
+	 * This compatibility wrapper retains the historical boolean result and one
+	 * grace probe for a live handle with pending results. Internal routing uses
+	 * get_connection_status() so that a busy handle is never mistaken for an
+	 * immediately reusable one.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return bool Whether the connection is alive.
+	 */
+	protected function is_connection_alive( $dbh ) {
+		$status = $this->get_connection_status( $dbh );
+
+		if ( self::CONNECTION_AVAILABLE === $status ) {
 			$this->clear_busy_connection_probe( $dbh );
 
-			return false;
+			return true;
 		}
+
+		if ( self::CONNECTION_BUSY === $status ) {
+			return $this->handle_connection_probe_failure( $dbh, self::MYSQL_COMMANDS_OUT_OF_SYNC );
+		}
+
+		$this->clear_busy_connection_probe( $dbh );
+
+		return false;
 	}
 
 	/**
