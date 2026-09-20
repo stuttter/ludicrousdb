@@ -75,6 +75,46 @@ class LudicrousDBTestDouble extends LudicrousDB {
 	}
 
 	/**
+	 * Record connection activity through the production heartbeat path.
+	 *
+	 * @param string|object $dbhname_or_dbh Database handle name or object.
+	 */
+	public function update_heartbeat_for_test( $dbhname_or_dbh ) {
+		$this->update_heartbeat( $dbhname_or_dbh );
+	}
+
+	/**
+	 * Exercise busy-probe recovery state without a live database server.
+	 *
+	 * @param mysqli|resource $dbh   Database connection.
+	 * @param int             $errno MySQL client error number.
+	 * @return bool Whether the handle receives its grace probe.
+	 */
+	public function handle_connection_probe_failure_for_test( $dbh, $errno ) {
+		return $this->handle_connection_probe_failure( $dbh, $errno );
+	}
+
+	/**
+	 * Clear busy-probe recovery state without a live database server.
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return void
+	 */
+	public function clear_busy_connection_probe_for_test( $dbh ) {
+		$this->clear_busy_connection_probe( $dbh );
+	}
+
+	/**
+	 * Exercise the production close path from tests.
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return bool Whether the handle was closed.
+	 */
+	public function close_for_real_for_test( $dbh ) {
+		return parent::close( $dbh );
+	}
+
+	/**
 	 * Record stale-handle removal without closing the test handle.
 	 *
 	 * @param string $dbhname Database handle name.
