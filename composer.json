@@ -28,7 +28,7 @@
     "php-stubs/wordpress-stubs": "6.4.*",
     "phpstan/phpstan": "^2.2.13",
     "phpunit/phpunit": "^9.6",
-    "sirbrillig/phpcs-variable-analysis": "^2.8",
+    "sirbrillig/phpcs-variable-analysis": "^3.0",
     "wp-coding-standards/wpcs": "^3.4.1"
   },
   "autoload-dev": {
