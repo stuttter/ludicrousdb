@@ -105,6 +105,38 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Connection state used by routing callbacks remains publicly readable.
+	 *
+	 * @param string $property Property name.
+	 *
+	 * @dataProvider callback_state_property_provider
+	 */
+	public function test_callback_state_properties_are_public( $property ) {
+		$reflection = new ReflectionProperty( LudicrousDB::class, $property );
+
+		$this->assertTrue( $reflection->isPublic() );
+	}
+
+	/**
+	 * Callback-facing state properties.
+	 *
+	 * @return array
+	 */
+	public function callback_state_property_provider() {
+		return array(
+			'unique_servers'  => array( 'unique_servers' ),
+			'callback_result' => array( 'callback_result' ),
+			'table'           => array( 'table' ),
+			'lag_threshold'   => array( 'lag_threshold' ),
+			'dbhname'         => array( 'dbhname' ),
+			'dataset'         => array( 'dataset' ),
+			'current_host'    => array( 'current_host' ),
+			'last_connection' => array( 'last_connection' ),
+			'lag_cache_key'   => array( 'lag_cache_key' ),
+		);
+	}
+
+	/**
 	 * Database hosts are normalized without losing ports, sockets, or IPv6.
 	 *
 	 * @param string $host     Configured host.

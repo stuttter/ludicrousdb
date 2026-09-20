@@ -199,88 +199,83 @@ There are many ways to achieve different configurations in different locations. 
 
 ## 4. Replication Lag
 
-LudicrousDB accommodates replica lag by making decisions, based on the defined lag threshold. If the lag threshold is not set, it will ignore the replica lag. Otherwise, it will try to find a non-lagged replica, before connecting to a lagged one.
+LudicrousDB accommodates replica lag by making decisions based on the defined lag threshold. If the lag threshold is not set, it ignores replica lag. Otherwise, it tries to find a non-lagged replica before connecting to a lagged one.
 
-A replica is considered lagged, if its lag is bigger than the lag threshold you have defined in `$wpdb->default_lag_threshold` or in the per-database settings. You can also rewrite the lag threshold, by returning `$server['lag_threshold']` variable with the 'dataset' group callbacks.
+A replica is considered lagged when its lag is greater than the per-database `lag_threshold`, or the default in `$wpdb->database_defaults['lag_threshold']`. A `dataset` callback may also override the threshold by returning `$server['lag_threshold']`.
 
-LudicrousDB does not check the lag on the replicas. You have to define two callbacks callbacks to do that:
+LudicrousDB does not impose a particular replication monitor. Register two callbacks to supply lag data:
 
 ```php
-$wpdb->add_callback( $callback, 'get_lag_cache' );
+$wpdb->add_callback( 'ludicrousdb_get_lag_cache', 'get_lag_cache' );
 ```
 
 and
 
 ```php
-$wpdb->add_callback( $callback, 'get_lag' );
+$wpdb->add_callback( 'ludicrousdb_get_lag', 'get_lag' );
 ```
 
-The first one is called before connecting to a replica, and should return either: the replication lag in seconds, or false if unknown (based on `$wpdb->lag_cache_key`).
+The first callback runs before LudicrousDB connects to a replica. It should return the cached lag in seconds, or `false` when the lag is unknown. `$wpdb->lag_cache_key` identifies the replica endpoint.
 
-The second callback is called after a connection to a replica is established. It should return either: it's replication lag, or false if unknown (based on the connection in `$wpdb->dbhs[ $wpdb->dbhname ]`).
+The second callback runs after the replica connection is established. It should measure and return lag in seconds, or `false` when the lag is unknown. The active connection is available in `$wpdb->dbhs[ $wpdb->dbhname ]`.
 
 ## Sample replication lag detection configuration
 
-To detect replication lag, try [mk-heartbeat](http://www.maatkit.org/doc/mk-heartbeat.html) or pt-heartbeat from Percona Toolkit. These tools insert a timestamp into a table on the primary and then check the lag on the replicas. The lag is the difference in seconds between the current time and the timestamp on the replica.
+The following example reads a heartbeat timestamp replicated from the primary. [Percona Toolkit's `pt-heartbeat`](https://docs.percona.com/percona-toolkit/pt-heartbeat.html) can maintain such a table. Change `heartbeat.heartbeat` to the qualified database and table used by your monitor.
 
-This implementation requires the database user to have read access to the heartbeat table.
+The LudicrousDB database user needs `SELECT` access to the heartbeat table. The query uses a qualified table name so it does not change the database selected for the WordPress query that follows.
 
-The cache uses shared memory for portability. Can be modified to work with Memcached, APC and etc.
+This example uses the WordPress object cache when it is available. With a persistent object-cache drop-in, the value can be shared across requests; otherwise the live check remains authoritative.
 
 ```php
-$wpdb->lag_cache_ttl = 30;
-$wpdb->shmem_key     = ftok( __FILE__, "Y" );
-$wpdb->shmem_size    = 128 * 1024;
-
-$wpdb->add_callback( 'get_lag_cache', 'get_lag_cache' );
-$wpdb->add_callback( 'get_lag',       'get_lag' );
-
-function get_lag_cache( $wpdb ) {
-    $segment  = shm_attach( $wpdb->shmem_key, $wpdb->shmem_size, 0600 );
-    $lag_data = @shm_get_var( $segment, 0 );
-
-    shm_detach( $segment );
-
-    if ( ! is_array( $lag_data ) || !is_array( $lag_data[ $wpdb->lag_cache_key ] ) ) {
-        return false;
-    }
-
-    if ( $wpdb->lag_cache_ttl < time() - $lag_data[ $wpdb->lag_cache_key ][ 'timestamp' ] ) {
-        return false;
-    }
-
-    return $lag_data[ $wpdb->lag_cache_key ][ 'lag' ];
+if ( ! defined( 'LUDICROUSDB_LAG_CACHE_TTL' ) ) {
+    define( 'LUDICROUSDB_LAG_CACHE_TTL', 30 );
 }
 
-function get_lag( $wpdb ) {
-    $dbh = $wpdb->dbhs[ $wpdb->dbhname ];
+$wpdb->add_callback( 'ludicrousdb_get_lag_cache', 'get_lag_cache' );
+$wpdb->add_callback( 'ludicrousdb_get_lag', 'get_lag' );
 
-    if ( ! mysql_select_db( 'heartbeat', $dbh ) ) {
+function ludicrousdb_get_lag_cache( $wpdb ) {
+    if ( ! function_exists( 'wp_cache_get' ) || empty( $GLOBALS['wp_object_cache'] ) ) {
         return false;
     }
 
-    $result = mysql_query( "SELECT UNIX_TIMESTAMP() - UNIX_TIMESTAMP(ts) AS lag FROM heartbeat LIMIT 1", $dbh );
+    $lag = wp_cache_get( $wpdb->lag_cache_key, 'ludicrousdb-lag' );
 
-    if ( ! $result || false === $row = mysql_fetch_assoc( $result ) ) {
+    return is_numeric( $lag ) ? (float) $lag : false;
+}
+
+function ludicrousdb_get_lag( $wpdb ) {
+    if ( empty( $wpdb->dbhs[ $wpdb->dbhname ] ) ) {
         return false;
     }
 
-    // Cache the result in shared memory with timestamp
-    $sem_id = sem_get( $wpdb->shmem_key, 1, 0600, 1 );
-    sem_acquire( $sem_id );
-    $segment = shm_attach( $wpdb->shmem_key, $wpdb->shmem_size, 0600 );
-    $lag_data = @shm_get_var( $segment, 0 );
+    $dbh    = $wpdb->dbhs[ $wpdb->dbhname ];
+    $result = mysqli_query(
+        $dbh,
+        'SELECT GREATEST( 0, UNIX_TIMESTAMP() - UNIX_TIMESTAMP( ts ) ) AS lag
+        FROM heartbeat.heartbeat
+        ORDER BY ts DESC
+        LIMIT 1'
+    );
 
-    if ( ! is_array( $lag_data ) ) {
-        $lag_data = array();
+    if ( false === $result ) {
+        return false;
     }
 
-    $lag_data[ $wpdb->lag_cache_key ] = array( 'timestamp' => time(), 'lag' => $row[ 'lag' ] );
+    $row = mysqli_fetch_assoc( $result );
+    mysqli_free_result( $result );
 
-    shm_put_var( $segment, 0, $lag_data );
-    shm_detach( $segment );
-    sem_release( $sem_id );
+    if ( ! is_array( $row ) || ! isset( $row['lag'] ) || ! is_numeric( $row['lag'] ) ) {
+        return false;
+    }
 
-    return $row[ 'lag' ];
+    $lag = (float) $row['lag'];
+
+    if ( function_exists( 'wp_cache_set' ) && ! empty( $GLOBALS['wp_object_cache'] ) ) {
+        wp_cache_set( $wpdb->lag_cache_key, $lag, 'ludicrousdb-lag', LUDICROUSDB_LAG_CACHE_TTL );
+    }
+
+    return $lag;
 }
 ```

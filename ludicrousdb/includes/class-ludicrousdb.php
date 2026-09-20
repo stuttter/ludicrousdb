@@ -261,63 +261,63 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @var null|int Default null. Might be zero or more.
 	 */
-	private $unique_servers = null;
+	public $unique_servers = null;
 
 	/**
 	 * Result of the last callback run.
 	 *
 	 * @var mixed Default null.
 	 */
-	private $callback_result = null;
+	public $callback_result = null;
 
 	/**
 	 * The current table being queried.
 	 *
 	 * @var string|null Default null.
 	 */
-	private $table = null;
+	public $table = null;
 
 	/**
 	 * The lag threshold for replica servers.
 	 *
 	 * @var float|null Default null.
 	 */
-	private $lag_threshold = null;
+	public $lag_threshold = null;
 
 	/**
 	 * The current database handle name.
 	 *
 	 * @var string|null Default null.
 	 */
-	private $dbhname = null;
+	public $dbhname = null;
 
 	/**
 	 * The current dataset being queried.
 	 *
 	 * @var string|null Default null.
 	 */
-	private $dataset = null;
+	public $dataset = null;
 
 	/**
 	 * The current host being connected to.
 	 *
 	 * @var string|null Default null.
 	 */
-	private $current_host = null;
+	public $current_host = null;
 
 	/**
 	 * The last database connection information.
 	 *
 	 * @var array|null Default null.
 	 */
-	private $last_connection = null;
+	public $last_connection = null;
 
 	/**
 	 * The cache key for lag information.
 	 *
 	 * @var string|null Default null.
 	 */
-	private $lag_cache_key = null;
+	public $lag_cache_key = null;
 
 	/**
 	 * Array of renamed class variables.
