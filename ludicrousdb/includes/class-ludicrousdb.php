@@ -1324,14 +1324,13 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @return bool|mysqli|resource
 	 */
-
-    protected function single_db_connect(
-        $dbhname,
-        $host,
-        $user,
-        #[\SensitiveParameter]
-        $password
-    ) {
+	protected function single_db_connect(
+		$dbhname,
+		$host,
+		$user,
+		#[\SensitiveParameter]
+		$password
+	) {
 		$tcp_cache_key  = $host;
 		$this->is_mysql = true;
 

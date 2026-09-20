@@ -1,0 +1,14 @@
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    level: 6
+    phpVersion: 70400
+    paths:
+        - ludicrousdb.php
+        - ludicrousdb
+    scanFiles:
+        - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+    tmpDir: build/phpstan
+    parallel:
+        maximumNumberOfProcesses: 1

@@ -6,9 +6,9 @@ Plugin URI:        https://github.com/stuttter/ludicrousdb/
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 License:           GPLv2 or later
 Tags:              database, mysql, performance, scaling, wpdb
-Requires PHP:      7.0
+Requires PHP:      7.4
 Requires at least: 5.0
-Tested up to:      6.5
+Tested up to:      7.1
 Stable tag:        5.3.0
 
 LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
