@@ -18,6 +18,32 @@ defined( 'ABSPATH' ) || exit;
  * @since 1.0.0
  */
 class LudicrousDB extends wpdb {
+	/**
+	 * MySQL client error for a command issued while results are still pending.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @var int
+	 */
+	private const MYSQL_COMMANDS_OUT_OF_SYNC = 2014;
+
+	/**
+	 * Handles that received one commands-out-of-sync grace probe.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @var array<string, bool|WeakReference<mysqli>>
+	 */
+	private $busy_connection_probes = array();
+
+	/**
+	 * Busy handles detached from routing while their active results finish.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @var array<string, mysqli|resource>
+	 */
+	private $detached_busy_connections = array();
 
 	/**
 	 * The last table that was queried.
@@ -1695,7 +1721,19 @@ class LudicrousDB extends wpdb {
 			return;
 		}
 
-		// A single connection can be cached under more than one routing name.
+		$this->release_connection_aliases( $dbh );
+		$this->close( $dbh );
+	}
+
+	/**
+	 * Remove every cached routing name for a handle without closing it.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return void
+	 */
+	protected function release_connection_aliases( $dbh ) {
 		foreach ( $this->dbhs as $other_dbhname => $other_dbh ) {
 			if ( $dbh !== $other_dbh ) {
 				continue;
@@ -1712,8 +1750,6 @@ class LudicrousDB extends wpdb {
 		if ( $this->dbh === $dbh ) {
 			$this->dbh = null;
 		}
-
-		$this->close( $dbh );
 	}
 
 	/**
@@ -1758,21 +1794,28 @@ class LudicrousDB extends wpdb {
 
 		$dbh = $this->get_db_object( $dbh_or_table );
 
-		// Return true if connection is alive. This is the most common case.
+		// Return true if connection is alive and immediately reusable. This is the most common case.
 		if ( $this->dbh_type_check( $dbh ) ) {
 			if ( $this->is_connection_alive( $dbh ) ) {
-				$this->update_heartbeat( $dbh );
+				if ( ! $this->has_busy_connection_probe( $dbh ) ) {
+					$this->update_heartbeat( $dbh );
 
-				return true;
-			}
+					return true;
+				}
 
-			// Remove the stale handle before db_connect() attempts a replacement.
-			$dbhname = $this->lookup_dbhs_name( $dbh );
-			if ( false !== $dbhname ) {
-				$this->disconnect( $dbhname );
-			} elseif ( $this->dbh === $dbh ) {
-				$this->dbh = null;
-				$this->close( $dbh );
+				// Preserve the active result while replacing the cached busy handle.
+				$this->preserve_busy_connection( $dbh );
+				$this->release_connection_aliases( $dbh );
+				$this->clear_busy_connection_probe( $dbh );
+			} else {
+				// Remove the stale handle before db_connect() attempts a replacement.
+				$dbhname = $this->lookup_dbhs_name( $dbh );
+				if ( false !== $dbhname ) {
+					$this->disconnect( $dbhname );
+				} elseif ( $this->dbh === $dbh ) {
+					$this->dbh = null;
+					$this->close( $dbh );
+				}
 			}
 		}
 
@@ -1863,9 +1906,154 @@ class LudicrousDB extends wpdb {
 	protected function is_connection_alive( $dbh ) {
 		try {
 			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- A failed probe is handled as a reconnect signal.
-			return false !== @mysqli_query( $dbh, 'DO 1' );
+			$responded = false !== @mysqli_query( $dbh, 'DO 1' );
+
+			if ( $responded ) {
+				$this->clear_busy_connection_probe( $dbh );
+
+				return true;
+			}
+
+			// An active unbuffered or multi-result query makes the handle busy, not dead.
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- A closed PHP 7.4 handle warns while reporting its error code.
+			return $this->handle_connection_probe_failure( $dbh, @mysqli_errno( $dbh ) );
+		} catch ( mysqli_sql_exception $exception ) {
+			return $this->handle_connection_probe_failure( $dbh, $exception->getCode() );
 		} catch ( Throwable $exception ) {
+			$this->clear_busy_connection_probe( $dbh );
+
 			return false;
+		}
+	}
+
+	/**
+	 * Allow one busy probe before treating a repeatedly blocked handle as stale.
+	 *
+	 * A single grace probe avoids closing a connection that still has a legitimate
+	 * unbuffered or multi-query result. If the same handle remains blocked on the
+	 * next probe, the normal reconnect path can recover it instead of retaining an
+	 * abandoned result set indefinitely.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param mysqli|resource $dbh   Database connection.
+	 * @param int             $errno MySQL client error number.
+	 * @return bool Whether the busy handle should receive its grace probe.
+	 */
+	protected function handle_connection_probe_failure( $dbh, $errno ) {
+		$key = $this->connection_probe_key( $dbh );
+
+		if ( self::MYSQL_COMMANDS_OUT_OF_SYNC !== (int) $errno ) {
+			$this->clear_busy_connection_probe( $dbh );
+
+			return false;
+		}
+
+		if ( false === $key ) {
+			return false;
+		}
+
+		if ( $this->has_busy_connection_probe( $dbh ) ) {
+			return false;
+		}
+
+		$this->busy_connection_probes[ $key ] = is_object( $dbh )
+			? WeakReference::create( $dbh )
+			: true;
+
+		return true;
+	}
+
+	/**
+	 * Clear a handle's busy-probe grace after it responds normally.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return void
+	 */
+	protected function clear_busy_connection_probe( $dbh ) {
+		$key = $this->connection_probe_key( $dbh );
+
+		if ( false !== $key ) {
+			unset( $this->busy_connection_probes[ $key ] );
+		}
+	}
+
+	/**
+	 * Whether the handle currently owns a busy-probe grace marker.
+	 *
+	 * Weak references prevent a recycled object ID from inheriting state from a
+	 * handle that was released without an explicit close.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return bool Whether the handle is marked busy.
+	 */
+	protected function has_busy_connection_probe( $dbh ) {
+		$key = $this->connection_probe_key( $dbh );
+
+		if ( false === $key || ! isset( $this->busy_connection_probes[ $key ] ) ) {
+			return false;
+		}
+
+		$marker = $this->busy_connection_probes[ $key ];
+
+		return $marker instanceof WeakReference
+			? $dbh === $marker->get()
+			: true;
+	}
+
+	/**
+	 * Return a stable request-local key for a database handle.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return string|false Handle key, or false for an invalid handle.
+	 */
+	private function connection_probe_key( $dbh ) {
+		if ( is_object( $dbh ) ) {
+			return 'object:' . spl_object_id( $dbh );
+		}
+
+		if ( is_resource( $dbh ) ) {
+			return 'resource:' . (int) $dbh;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Retain a detached busy handle until explicit close or request shutdown.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return void
+	 */
+	private function preserve_busy_connection( $dbh ) {
+		$key = $this->connection_probe_key( $dbh );
+
+		if ( false !== $key ) {
+			$this->detached_busy_connections[ $key ] = $dbh;
+		}
+	}
+
+	/**
+	 * Stop retaining a detached handle that is being closed explicitly.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return void
+	 */
+	private function release_busy_connection( $dbh ) {
+		$key = $this->connection_probe_key( $dbh );
+
+		if ( false !== $key ) {
+			unset( $this->detached_busy_connections[ $key ] );
 		}
 	}
 
@@ -2164,6 +2352,9 @@ class LudicrousDB extends wpdb {
 		if ( ! $this->dbh_type_check( $dbh ) ) {
 			return false;
 		}
+
+		$this->clear_busy_connection_probe( $dbh );
+		$this->release_busy_connection( $dbh );
 
 		$already_closed         = false;
 		$previous_error_handler = null;

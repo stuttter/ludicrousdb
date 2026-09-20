@@ -258,6 +258,100 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Heartbeats probe new and idle handles without probing active traffic.
+	 */
+	public function test_heartbeat_probe_schedule_tracks_connection_activity() {
+		$database                       = new LudicrousDBTestDouble();
+		$database->check_dbh_heartbeats = true;
+		$database->recheck_timeout      = 60;
+		$dbhname                        = 'global__r';
+
+		$this->assertTrue( $database->should_mysql_ping( $dbhname ) );
+
+		$database->update_heartbeat_for_test( $dbhname );
+		$this->assertFalse( $database->should_mysql_ping( $dbhname ) );
+
+		$database->dbhname_heartbeats[ $dbhname ]['last_used'] = microtime( true ) - 61;
+		$this->assertTrue( $database->should_mysql_ping( $dbhname ) );
+	}
+
+	/**
+	 * A busy connection receives one grace probe before normal recovery resumes.
+	 */
+	public function test_busy_connection_probe_grace_is_bounded_and_resettable() {
+		$database = new LudicrousDBTestDouble();
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is sufficient for request-local probe state.
+		$dbh = mysqli_init();
+
+		$this->assertTrue( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+		$this->assertFalse( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+		$this->assertFalse( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+		$this->assertFalse( $database->handle_connection_probe_failure_for_test( $dbh, DB_SERVER_GONE_ERROR ) );
+
+		$this->assertTrue( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+		$database->clear_busy_connection_probe_for_test( $dbh );
+		$this->assertTrue( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+	}
+
+	/**
+	 * Closing a handle clears its request-local busy-probe state.
+	 */
+	public function test_closing_connection_clears_busy_probe_grace() {
+		$database = new LudicrousDBTestDouble();
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle exercises close cleanup without a server dependency.
+		$dbh = mysqli_init();
+
+		$database->dbh = $dbh;
+		$this->assertTrue( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+		$this->assertTrue( $database->close_for_real_for_test( $dbh ) );
+		$this->assertTrue( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+	}
+
+	/**
+	 * A busy cached handle is detached without closing its active result.
+	 */
+	public function test_check_connection_replaces_busy_handle_without_closing_it() {
+		$database                          = new LudicrousDBTestDouble();
+		$database->connection_probe_result = true;
+		$database->reconnect_retries       = 1;
+		$database->reconnect_sleep         = 0;
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is sufficient for deterministic cache-detachment behavior.
+		$dbh = mysqli_init();
+
+		$database->dbh                = $dbh;
+		$database->dbhs['global__r']  = $dbh;
+		$database->open_connections[] = 'global__r';
+		$this->assertTrue( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+
+		$this->assertFalse( $database->check_connection( false, $dbh, 'SELECT 1' ) );
+		$this->assertSame( array( 'probe', 'reconnect' ), $database->connection_events );
+		$this->assertArrayNotHasKey( 'global__r', $database->dbhs );
+		$this->assertSame( array(), array_values( $database->open_connections ) );
+		$this->assertNull( $database->dbh );
+		$this->assertSame( 0, $database->close_calls );
+
+		$database->close_for_real_for_test( $dbh );
+	}
+
+	/**
+	 * A known disconnect error forces one immediate heartbeat probe.
+	 */
+	public function test_heartbeat_probe_consumes_a_known_disconnect_error() {
+		$database                                 = new LudicrousDBTestDouble();
+		$database->check_dbh_heartbeats           = true;
+		$database->recheck_timeout                = 60;
+		$dbhname                                  = 'global__r';
+		$database->dbhname_heartbeats[ $dbhname ] = array(
+			'last_used'  => microtime( true ),
+			'last_errno' => DB_SERVER_GONE_ERROR,
+		);
+
+		$this->assertTrue( $database->should_mysql_ping( $dbhname ) );
+		$this->assertArrayNotHasKey( 'last_errno', $database->dbhname_heartbeats[ $dbhname ] );
+		$this->assertFalse( $database->should_mysql_ping( $dbhname ) );
+	}
+
+	/**
 	 * A closed mysqli object can be removed without closing it a second time.
 	 */
 	public function test_check_connection_safely_removes_a_closed_handle() {
