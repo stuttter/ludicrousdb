@@ -402,6 +402,9 @@ class LudicrousDB extends wpdb {
 		// Check if old var is in $class_vars_renamed
 		if ( isset( self::$renamed_vars[ $name ] ) ) {
 			$name = self::$renamed_vars[ $name ];
+
+			// Renamed properties may be private to this class.
+			return $this->{$name};
 		}
 
 		return parent::__get( $name );
@@ -420,6 +423,11 @@ class LudicrousDB extends wpdb {
 		// Check if old var is in $class_vars_renamed
 		if ( isset( self::$renamed_vars[ $name ] ) ) {
 			$name = self::$renamed_vars[ $name ];
+
+			// Renamed properties may be private to this class.
+			$this->{$name} = $value;
+
+			return;
 		}
 
 		parent::__set( $name, $value );
@@ -454,7 +462,7 @@ class LudicrousDB extends wpdb {
 
 			// Only compact if all params are not empty
 			if ( ! empty( $dbpassword ) && ! empty( $dbname ) && ! empty( $dbhost ) ) {
-				$class_vars = compact( $dbuser, $dbpassword, $dbname, $dbhost );
+				$class_vars = compact( 'dbuser', 'dbpassword', 'dbname', 'dbhost' );
 			}
 		}
 
@@ -741,15 +749,23 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $query Query.
+	 * @param bool|string $allow_bail Optional. Allows the function to bail. A query string preserves
+	 *                                the historical calling convention. Default true.
+	 * @param string      $query      Optional. Query used to select a LudicrousDB dataset.
 	 *
-	 * @return resource MySQL database connection
+	 * @return false|mysqli|resource MySQL database connection.
 	 */
-	public function db_connect( $query = '' ) {
+	public function db_connect( $allow_bail = true, $query = '' ) {
 
-		// Bail if empty query
+		// Preserve the historical db_connect( $query ) calling convention.
+		if ( is_string( $allow_bail ) && '' === $query ) {
+			$query      = $allow_bail;
+			$allow_bail = $this->die_on_disconnect;
+		}
+
+		// Core may call db_connect() before a query is available.
 		if ( empty( $query ) ) {
-			return false;
+			$query = 'SELECT 1';
 		}
 
 		// Fix error reporting change (in PHP 8.1) causing fatal errors
@@ -789,7 +805,9 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( empty( $dataset ) ) {
-			return $this->bail( "Unable to determine which dataset to query. ({$this->table})" );
+			return $allow_bail
+				? $this->bail( "Unable to determine which dataset to query. ({$this->table})" )
+				: false;
 		} else {
 			$this->dataset = $dataset;
 		}
@@ -813,7 +831,9 @@ class LudicrousDB extends wpdb {
 				||
 				! defined( 'DB_NAME' )
 			) {
-				return $this->bail( 'We were unable to query because there was no database defined.' );
+				return $allow_bail
+					? $this->bail( 'We were unable to query because there was no database defined.' )
+					: false;
 			}
 
 			// Fallback to wpdb::db_connect() method.
@@ -823,7 +843,7 @@ class LudicrousDB extends wpdb {
 			$this->dbname     = DB_NAME;
 			$this->dbhost     = DB_HOST;
 
-			parent::db_connect();
+			parent::db_connect( $allow_bail );
 
 			return $this->dbh;
 		}
@@ -970,12 +990,16 @@ class LudicrousDB extends wpdb {
 			&&
 			$this->is_primary_dead()
 		) {
-			return $this->bail( 'We are updating the database. Please try back in 5 minutes. If you are posting to your blog please hit the refresh button on your browser in a few minutes to post the data again. It will be posted as soon as the database is back online.' );
+			return $allow_bail
+				? $this->bail( 'We are updating the database. Please try back in 5 minutes. If you are posting to your blog please hit the refresh button on your browser in a few minutes to post the data again. It will be posted as soon as the database is back online.' )
+				: false;
 		}
 
 		// Bail if no servers available for table/dataset/operation
 		if ( empty( $this->ludicrous_servers[ $dataset ][ $operation ] ) ) {
-			return $this->bail( "No databases available with {$this->table} ({$dataset})" );
+			return $allow_bail
+				? $this->bail( "No databases available with {$this->table} ({$dataset})" )
+				: false;
 		}
 
 		// Put the operations in order by key
@@ -997,7 +1021,9 @@ class LudicrousDB extends wpdb {
 
 			$tries_remaining = count( $servers );
 			if ( 0 === $tries_remaining ) {
-				return $this->bail( "No database servers were found to match the query. ({$this->table}, {$dataset})" );
+				return $allow_bail
+					? $this->bail( "No database servers were found to match the query. ({$this->table}, {$dataset})" )
+					: false;
 			}
 
 			if ( is_null( $this->unique_servers ) ) {
@@ -1258,7 +1284,9 @@ class LudicrousDB extends wpdb {
 
 				$this->run_callbacks( 'db_connection_error', $callback_data );
 
-				return $this->bail( "Unable to connect to {$host}:{$port} to {$operation} table '{$this->table}' ({$dataset})" );
+				return $allow_bail
+					? $this->bail( "Unable to connect to {$host}:{$port} to {$operation} table '{$this->table}' ({$dataset})" )
+					: false;
 			}
 
 			break;
@@ -1479,13 +1507,18 @@ class LudicrousDB extends wpdb {
 	 * @since 1.0.0
 	 *
 	 * @param string                       $db           MySQL database name.
-	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
-	 *                                                   - the current database
-	 *                                                   - the database housing the specified table
-	 *                                                   - the database of the MySQL resource
+	 * @param false|string|mysqli|resource $dbh          Optional. Database handle or, for backward
+	 *                                                   compatibility, a table name.
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. Historical named-argument alias.
 	 */
-	public function select( $db, $dbh_or_table = false ) {
-		$dbh = $this->get_db_object( $dbh_or_table );
+	public function select( $db, $dbh = null, $dbh_or_table = null ) {
+
+		// Prefer the historical named argument when explicitly supplied.
+		if ( null !== $dbh_or_table ) {
+			$dbh = $dbh_or_table;
+		}
+
+		$dbh = $this->get_db_object( null === $dbh ? false : $dbh );
 
 		if ( ! $this->dbh_type_check( $dbh ) ) {
 			return false;
@@ -1538,17 +1571,23 @@ class LudicrousDB extends wpdb {
 	 * See set_charset().
 	 *
 	 * @since 1.0.0
-	 * @param string $to_escape String to escape.
+	 * @param string $data      String to escape.
+	 * @param mixed  $to_escape Historical named-argument alias.
 	 */
-	public function _real_escape( $to_escape = '' ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
+	public function _real_escape( $data = '', $to_escape = null ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
+
+		// Preserve callers using the old $to_escape named argument.
+		if ( null !== $to_escape ) {
+			$data = $to_escape;
+		}
 
 		// Bail if not a scalar
-		if ( ! is_scalar( $to_escape ) ) {
+		if ( ! is_scalar( $data ) ) {
 			return '';
 		}
 
 		// Slash the query part
-		$escaped = addslashes( $to_escape );
+		$escaped = addslashes( $data );
 
 		// Maybe use WordPress core placeholder method
 		if ( method_exists( $this, 'add_placeholder_escape' ) ) {
@@ -1663,13 +1702,20 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param bool   $die_on_disconnect Optional. Allows the function to die. Default true.
-	 * @param bool   $dbh_or_table      Optional.
-	 * @param string $query             Optional. Query string passed db_connect
+	 * @param bool                         $allow_bail        Optional. Allows the function to bail. Default true.
+	 * @param false|string|mysqli|resource $dbh_or_table      Optional. Database handle or table name.
+	 * @param string                       $query             Optional. Query string passed to db_connect().
+	 * @param bool|null                    $die_on_disconnect Historical named-argument alias.
 	 *
 	 * @return bool|void True if the connection is up.
 	 */
-	public function check_connection( $die_on_disconnect = true, $dbh_or_table = false, $query = '' ) {
+	public function check_connection( $allow_bail = true, $dbh_or_table = false, $query = '', $die_on_disconnect = null ) {
+
+		// Preserve callers using the old $die_on_disconnect named argument.
+		if ( null !== $die_on_disconnect ) {
+			$allow_bail = $die_on_disconnect;
+		}
+
 		$dbh = $this->get_db_object( $dbh_or_table );
 
 		// Return true if connection is alive. This is the most common case.
@@ -1717,7 +1763,7 @@ class LudicrousDB extends wpdb {
 		for ( $tries = 1; $tries <= $this->reconnect_retries; $tries++ ) {
 
 			// Try to reconnect
-			$retry = $this->db_connect( $query );
+			$retry = $this->db_connect( false, $query );
 
 			// Return true if the connection is up
 			if ( false !== $retry ) {
@@ -1735,11 +1781,11 @@ class LudicrousDB extends wpdb {
 			}
 
 			// Sleep before retrying
-			sleep( $this->reconnect_sleep );
+			usleep( (int) ( $this->reconnect_sleep * 1000000 ) );
 		}
 
 		// Bail here if not allowed to call $this->bail()
-		if ( false === $die_on_disconnect ) {
+		if ( false === $allow_bail ) {
 			return false;
 		}
 
@@ -1882,7 +1928,7 @@ class LudicrousDB extends wpdb {
 			$this->last_found_rows_result = null;
 			$elapsed                      = 0;
 		} else {
-			$this->dbh = $this->db_connect( $query );
+			$this->dbh = $this->db_connect( $this->die_on_disconnect, $query );
 
 			if ( ! $this->dbh_type_check( $this->dbh ) ) {
 				$this->run_query_log_callbacks( $query, $retval );
@@ -1942,9 +1988,16 @@ class LudicrousDB extends wpdb {
 		// If there is an error then take note of it
 		if ( $this->dbh_type_check( $this->dbh ) ) {
 			$this->last_error = mysqli_error( $this->dbh );
+		} else {
+			$this->last_error = __( 'Unable to retrieve the error message from the database server', 'ludicrousdb' );
 		}
 
 		if ( ! empty( $this->last_error ) ) {
+			// Clear insert_id on a subsequent failed insert.
+			if ( $this->insert_id && preg_match( '/^\s*(insert|replace)\s/i', $query ) ) {
+				$this->insert_id = 0;
+			}
+
 			$this->print_error( $this->last_error );
 			$retval = false;
 
@@ -2138,6 +2191,12 @@ class LudicrousDB extends wpdb {
 	 * @return bool
 	 */
 	public function has_cap( $db_cap, $dbh_or_table = false ) {
+
+		// This capability belongs to wpdb::prepare(), not to a database server.
+		if ( 'identifier_placeholders' === strtolower( $db_cap ) ) {
+			return parent::has_cap( $db_cap );
+		}
+
 		$db_version     = $this->db_version( $dbh_or_table );
 		$db_server_info = $this->db_server_info( $dbh_or_table );
 
@@ -2148,7 +2207,11 @@ class LudicrousDB extends wpdb {
 			&&
 			( false !== strpos( $db_server_info, 'MariaDB' ) )
 			&&
-			version_compare( phpversion(), '8.0.16', '<' ) // PHP 8.0.15 or older.
+			(
+				PHP_VERSION_ID <= 80015 // PHP 8.0.15 or older.
+				||
+				( 80100 <= PHP_VERSION_ID && PHP_VERSION_ID <= 80102 ) // PHP 8.1.0 to PHP 8.1.2.
+			)
 		) {
 			// Strip the '5.5.5-' prefix and set the version to the correct value.
 			$db_server_info = preg_replace( '/^5\.5\.5-(.*)/', '$1', $db_server_info );
@@ -2282,7 +2345,7 @@ class LudicrousDB extends wpdb {
 
 			// Table name
 		} elseif ( is_string( $dbh_or_table ) ) {
-			$dbh = $this->db_connect( "SELECT FROM {$dbh_or_table} {$this->users}" );
+			$dbh = $this->db_connect( $this->die_on_disconnect, "SELECT FROM {$dbh_or_table} {$this->users}" );
 		}
 
 		return $dbh;

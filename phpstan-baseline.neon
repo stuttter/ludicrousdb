@@ -67,12 +67,6 @@ parameters:
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
 		-
-			message: '#^Call to function is_scalar\(\) with string will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
 			message: '#^Call to function method_exists\(\) with \$this\(LudicrousDB\) and ''add_placeholder…'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
@@ -178,18 +172,6 @@ parameters:
 			message: '#^Method LudicrousDB\:\:check_tcp_responsiveness\(\) should return bool but returns string\.$#'
 			identifier: return.type
 			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Method LudicrousDB\:\:db_connect\(\) should return resource but returns false\.$#'
-			identifier: return.type
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Method LudicrousDB\:\:db_connect\(\) should return resource but returns false\|null\.$#'
-			identifier: return.type
-			count: 6
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
 		-
@@ -361,44 +343,8 @@ parameters:
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
 		-
-			message: '#^Parameter \#1 \$dbh of method LudicrousDB\:\:lookup_dbhs_name\(\) expects object, resource given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
 			message: '#^Parameter \#1 \$dbh_or_table of method LudicrousDB\:\:get_db_object\(\) expects mysqli\|resource\|string\|false, bool given\.$#'
 			identifier: argument.type
-			count: 2
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Parameter \#1 \$link of function mysqli_affected_rows expects mysqli, resource given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Parameter \#1 \$link of function mysqli_errno expects mysqli, resource given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Parameter \#1 \$link of function mysqli_error expects mysqli, resource given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Parameter \#1 \$link of function mysqli_insert_id expects mysqli, resource given\.$#'
-			identifier: argument.type
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Parameter \#1 \$query \(string\) of method LudicrousDB\:\:db_connect\(\) should be compatible with parameter \$allow_bail \(bool\) of method wpdb\:\:db_connect\(\)$#'
-			identifier: method.childParameterType
 			count: 1
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
@@ -412,12 +358,6 @@ parameters:
 			message: '#^Parameter \#2 \$dbh_or_table of method LudicrousDB\:\:_do_query\(\) expects bool, mysqli\|resource given\.$#'
 			identifier: argument.type
 			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Parameter \#2 \$dbh_or_table of method LudicrousDB\:\:_do_query\(\) expects bool, resource given\.$#'
-			identifier: argument.type
-			count: 2
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
 		-
@@ -547,27 +487,9 @@ parameters:
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
 		-
-			message: '#^Return type \(resource\) of method LudicrousDB\:\:db_connect\(\) should be compatible with return type \(bool\) of method wpdb\:\:db_connect\(\)$#'
-			identifier: method.childReturnType
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between false and resource will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
 			message: '#^Undefined variable\: \$server$#'
 			identifier: variable.undefined
 			count: 2
-			path: ludicrousdb/includes/class-ludicrousdb.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
-			count: 1
 			path: ludicrousdb/includes/class-ludicrousdb.php
 
 		-

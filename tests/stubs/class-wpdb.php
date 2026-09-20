@@ -7,6 +7,34 @@
  */
 class wpdb {
 	/**
+	 * Database user.
+	 *
+	 * @var string
+	 */
+	protected $dbuser = '';
+
+	/**
+	 * Database password.
+	 *
+	 * @var string
+	 */
+	protected $dbpassword = '';
+
+	/**
+	 * Database name.
+	 *
+	 * @var string
+	 */
+	protected $dbname = '';
+
+	/**
+	 * Database host.
+	 *
+	 * @var string
+	 */
+	protected $dbhost = '';
+
+	/**
 	 * Current character set.
 	 *
 	 * @var string
@@ -41,6 +69,10 @@ class wpdb {
 	 * @return mixed
 	 */
 	public function __get( $name ) {
+		if ( property_exists( $this, $name ) ) {
+			return $this->{$name};
+		}
+
 		return isset( $this->compat_properties[ $name ] )
 			? $this->compat_properties[ $name ]
 			: null;
@@ -77,5 +109,15 @@ class wpdb {
 			'charset' => $charset,
 			'collate' => $collate,
 		);
+	}
+
+	/**
+	 * Report capabilities implemented by the installed wpdb version.
+	 *
+	 * @param string $db_cap Capability name.
+	 * @return bool
+	 */
+	public function has_cap( $db_cap ) {
+		return 'identifier_placeholders' === $db_cap;
 	}
 }

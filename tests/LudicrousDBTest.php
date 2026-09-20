@@ -17,6 +17,94 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * The wpdb-style constructor assigns all four connection properties.
+	 */
+	public function test_constructor_accepts_wpdb_connection_arguments() {
+		$database = new LudicrousDB( 'database-user', 'password', 'database', 'database.example.test' );
+
+		$this->assertSame( 'database-user', $database->dbuser );
+		$this->assertSame( 'password', $database->dbpassword );
+		$this->assertSame( 'database', $database->dbname );
+		$this->assertSame( 'database.example.test', $database->dbhost );
+	}
+
+	/**
+	 * Historical public property names remain readable and writable.
+	 */
+	public function test_renamed_properties_remain_compatible() {
+		$database = new LudicrousDB();
+
+		$database->allow_bail       = true;
+		$database->ignore_slave_lag = true;
+		$database->srtm             = true;
+
+		$this->assertTrue( $database->allow_bail );
+		$this->assertTrue( $database->ignore_slave_lag );
+		$this->assertTrue( $database->srtm );
+		$this->assertTrue( $database->die_on_disconnect );
+		$this->assertTrue( $database->send_reads_to_primaries );
+	}
+
+	/**
+	 * Public method names match wpdb while retaining LudicrousDB aliases.
+	 *
+	 * @param string $method     Method name.
+	 * @param array  $parameters Expected parameter names.
+	 *
+	 * @dataProvider method_parameter_provider
+	 */
+	public function test_public_method_parameter_names( $method, $parameters ) {
+		$reflection = new ReflectionMethod( LudicrousDB::class, $method );
+		$actual     = array_map(
+			function ( ReflectionParameter $parameter ) {
+				return $parameter->getName();
+			},
+			$reflection->getParameters()
+		);
+
+		$this->assertSame( $parameters, $actual );
+	}
+
+	/**
+	 * Public method parameter contracts.
+	 *
+	 * @return array
+	 */
+	public function method_parameter_provider() {
+		return array(
+			'db_connect'       => array( 'db_connect', array( 'allow_bail', 'query' ) ),
+			'select'           => array( 'select', array( 'db', 'dbh', 'dbh_or_table' ) ),
+			'_real_escape'     => array( '_real_escape', array( 'data', 'to_escape' ) ),
+			'check_connection' => array( 'check_connection', array( 'allow_bail', 'dbh_or_table', 'query', 'die_on_disconnect' ) ),
+		);
+	}
+
+	/**
+	 * Both current and historical named arguments escape identically.
+	 */
+	public function test_real_escape_named_argument_compatibility() {
+		$database = new LudicrousDB();
+
+		$this->assertSame(
+			"O\\'Reilly",
+			call_user_func_array( array( $database, '_real_escape' ), array( 'data' => "O'Reilly" ) )
+		);
+		$this->assertSame(
+			"O\\'Reilly",
+			call_user_func_array( array( $database, '_real_escape' ), array( 'to_escape' => "O'Reilly" ) )
+		);
+	}
+
+	/**
+	 * Identifier placeholders track the installed wpdb implementation.
+	 */
+	public function test_identifier_placeholder_capability_comes_from_wpdb() {
+		$database = new LudicrousDB();
+
+		$this->assertTrue( $database->has_cap( 'identifier_placeholders' ) );
+	}
+
+	/**
 	 * Server definitions retain their configured priority groups.
 	 */
 	public function test_database_configuration_preserves_read_and_write_priorities() {
