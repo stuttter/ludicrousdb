@@ -166,6 +166,16 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Normal queries retain LudicrousDB's historical fatal-handling behavior.
+	 */
+	public function test_query_allows_connection_failure_to_bail() {
+		$database = new LudicrousDB();
+
+		$this->assertFalse( $database->query( 'SELECT * FROM wp_users' ) );
+		$this->assertSame( array( true ), $database->db_connect_calls );
+	}
+
+	/**
 	 * Current and historical reconnect flags both suppress fatal handling.
 	 */
 	public function test_check_connection_argument_compatibility() {

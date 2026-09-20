@@ -1939,7 +1939,7 @@ class LudicrousDB extends wpdb {
 			$this->last_found_rows_result = null;
 			$elapsed                      = 0;
 		} else {
-			$this->dbh = $this->db_connect( $this->die_on_disconnect, $query );
+			$this->dbh = $this->db_connect( $query );
 
 			if ( ! $this->dbh_type_check( $this->dbh ) ) {
 				$this->run_query_log_callbacks( $query, $retval );
@@ -1999,8 +1999,6 @@ class LudicrousDB extends wpdb {
 		// If there is an error then take note of it
 		if ( $this->dbh_type_check( $this->dbh ) ) {
 			$this->last_error = mysqli_error( $this->dbh );
-		} else {
-			$this->last_error = __( 'Unable to retrieve the error message from the database server', 'ludicrousdb' );
 		}
 
 		if ( ! empty( $this->last_error ) ) {
@@ -2356,7 +2354,7 @@ class LudicrousDB extends wpdb {
 
 			// Table name
 		} elseif ( is_string( $dbh_or_table ) ) {
-			$dbh = $this->db_connect( $this->die_on_disconnect, "SELECT FROM {$dbh_or_table} {$this->users}" );
+			$dbh = $this->db_connect( "SELECT FROM {$dbh_or_table} {$this->users}" );
 		}
 
 		return $dbh;

@@ -125,6 +125,14 @@ class wpdb {
 	}
 
 	/**
+	 * Clear query state needed by the isolated tests.
+	 */
+	public function flush() {
+		$this->last_error = '';
+		$this->num_rows   = 0;
+	}
+
+	/**
 	 * Record database error handling without terminating the test process.
 	 *
 	 * @param string $message Error message.
