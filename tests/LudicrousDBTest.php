@@ -281,6 +281,25 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Disconnecting a failed scalar entry does not evict unrelated failures.
+	 */
+	public function test_disconnect_does_not_alias_scalar_failure_entries() {
+		$database                     = new LudicrousDBTestDouble();
+		$database->dbhs['first__r']   = false;
+		$database->dbhs['second__r']  = false;
+		$database->open_connections[] = 'first__r';
+		$database->open_connections[] = 'already-removed__r';
+
+		$database->disconnect( 'first__r' );
+		$database->disconnect( 'already-removed__r' );
+
+		$this->assertArrayNotHasKey( 'first__r', $database->dbhs );
+		$this->assertArrayHasKey( 'second__r', $database->dbhs );
+		$this->assertSame( array(), array_values( $database->open_connections ) );
+		$this->assertSame( 0, $database->close_calls );
+	}
+
+	/**
 	 * Identifier placeholders track the installed wpdb implementation.
 	 */
 	public function test_identifier_placeholder_capability_comes_from_wpdb() {

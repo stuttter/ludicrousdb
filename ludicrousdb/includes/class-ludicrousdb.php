@@ -967,15 +967,20 @@ class LudicrousDB extends wpdb {
 			$this->last_connection  = compact( 'dbhname', 'name' );
 
 			// Check if the connection is still alive
-			if (
-				$this->should_mysql_ping( $dbhname )
-				&&
-				! $this->check_connection( $this->die_on_disconnect, $this->dbhs[ $dbhname ], $query )
-			) {
-				$this->increment_db_connection( $conn, 'disconnect (ping failed)' );
-				$this->disconnect( $dbhname );
+			if ( $this->should_mysql_ping( $dbhname ) ) {
+				if ( ! $this->check_connection( $this->die_on_disconnect, $this->dbhs[ $dbhname ], $query ) ) {
+					$this->increment_db_connection( $conn, 'disconnect (ping failed)' );
+					$this->disconnect( $dbhname );
 
-				break;
+					break;
+				}
+
+				// A reconnect callback may route the query to a different cached name.
+				if ( ! isset( $this->dbhs[ $dbhname ] ) || ! $this->dbh_type_check( $this->dbhs[ $dbhname ] ) ) {
+					return $this->dbh_type_check( $this->dbh )
+						? $this->dbh
+						: false;
+				}
 			}
 
 			// Increment the connection counter
@@ -1674,11 +1679,21 @@ class LudicrousDB extends wpdb {
 	 * @param string $dbhname Database name.
 	 */
 	public function disconnect( $dbhname ) {
+		$key = array_search( $dbhname, $this->open_connections, true );
+		if ( false !== $key ) {
+			unset( $this->open_connections[ $key ] );
+		}
+
 		if ( ! isset( $this->dbhs[ $dbhname ] ) ) {
 			return;
 		}
 
 		$dbh = $this->dbhs[ $dbhname ];
+		if ( ! $this->dbh_type_check( $dbh ) ) {
+			unset( $this->dbhs[ $dbhname ] );
+
+			return;
+		}
 
 		// A single connection can be cached under more than one routing name.
 		foreach ( $this->dbhs as $other_dbhname => $other_dbh ) {
@@ -1698,9 +1713,7 @@ class LudicrousDB extends wpdb {
 			$this->dbh = null;
 		}
 
-		if ( $this->dbh_type_check( $dbh ) ) {
-			$this->close( $dbh );
-		}
+		$this->close( $dbh );
 	}
 
 	/**
