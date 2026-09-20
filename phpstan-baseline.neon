@@ -1,0 +1,529 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Constant DB_HOST not found\.$#'
+			identifier: constant.notFound
+			count: 2
+			path: ludicrousdb/drop-ins/db-config.php
+
+		-
+			message: '#^Constant DB_NAME not found\.$#'
+			identifier: constant.notFound
+			count: 2
+			path: ludicrousdb/drop-ins/db-config.php
+
+		-
+			message: '#^Constant DB_PASSWORD not found\.$#'
+			identifier: constant.notFound
+			count: 2
+			path: ludicrousdb/drop-ins/db-config.php
+
+		-
+			message: '#^Constant DB_USER not found\.$#'
+			identifier: constant.notFound
+			count: 2
+			path: ludicrousdb/drop-ins/db-config.php
+
+		-
+			message: '#^Variable \$wpdb might not be defined\.$#'
+			identifier: variable.undefined
+			count: 11
+			path: ludicrousdb/drop-ins/db-config.php
+
+		-
+			message: '#^Access to an undefined property LudicrousDB\:\:\$lag\.$#'
+			identifier: property.notFound
+			count: 6
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Access to an undefined property LudicrousDB\:\:\$tcp_responsive\.$#'
+			identifier: property.notFound
+			count: 5
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Call to function is_array\(\) with \*NEVER\* will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Call to function is_callable\(\) with callable\(\)\: mixed will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(LudicrousDB\) and ''add_placeholder…'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Constant DB_LAG_BEHIND not found\.$#'
+			identifier: constant.notFound
+			count: 3
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Constant DB_LAG_OK not found\.$#'
+			identifier: constant.notFound
+			count: 2
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Constant DB_LAG_UNKNOWN not found\.$#'
+			identifier: constant.notFound
+			count: 2
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Constant DB_SERVER_GONE_ERROR not found\.$#'
+			identifier: constant.notFound
+			count: 4
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Constant DB_SERVER_LOST_ERROR not found\.$#'
+			identifier: constant.notFound
+			count: 4
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Default value of the parameter \#1 \$dbh \(false\) of method LudicrousDB\:\:lookup_dbhs_name\(\) is incompatible with type object\.$#'
+			identifier: parameter.defaultValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Instanceof between resource and mysqli_result will always evaluate to false\.$#'
+			identifier: instanceof.alwaysFalse
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:__construct\(\) has parameter \$dbuser with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:_do_query\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:add_callback\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:add_database\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:add_database\(\) has parameter \$db with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:add_table\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:check_database_version\(\) should return WP_Error but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:check_tcp_responsiveness\(\) should return bool but returns string\.$#'
+			identifier: return.type
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:disconnect\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:increment_db_connection\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:init_charset\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:is_debug\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:is_debug_display\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:is_saving_queries\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:log_query\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:log_query\(\) has parameter \$query_data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:lookup_dbhs_name\(\) should return string but returns false\.$#'
+			identifier: return.type
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:prepare_class_vars\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:prepare_class_vars\(\) has parameter \$dbuser with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:query\(\) should return int but returns false\.$#'
+			identifier: return.type
+			count: 3
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:run_callbacks\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:run_callbacks\(\) has parameter \$args with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:select\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:send_reads_to_masters\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:send_reads_to_primaries\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:set_charset\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:set_class_vars\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:set_class_vars\(\) has parameter \$args with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:set_sql_mode\(\) has parameter \$modes with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:single_db_connect\(\) should return bool\|mysqli\|resource but return statement is missing\.$#'
+			identifier: return.missing
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:tcp_cache_add_global_group\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Method LudicrousDB\:\:tcp_cache_start\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Offset ''host'' on array\{\} in isset\(\) does not exist\.$#'
+			identifier: isset.offset
+			count: 2
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^PHPDoc tag @param has invalid value \(LudicrousDB &\$this Current instance of LudicrousDB, passed by reference\.\)\: Unexpected token "Current", expected variable at offset 712 on line 17$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^PHPDoc tag @param has invalid value \(string      null   The filtered return value\. Default is null\.\)\: Unexpected token "null", expected variable at offset 586 on line 15$#'
+			identifier: phpDoc.parseError
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Parameter \#1 \$dbh_or_table of method LudicrousDB\:\:get_db_object\(\) expects mysqli\|resource\|string\|false, bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Parameter \#2 \$args of method LudicrousDB\:\:run_callbacks\(\) expects array\|null, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Parameter \#2 \$dbh_or_table of method LudicrousDB\:\:_do_query\(\) expects bool, mysqli\|resource given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Parameter \$callback of method LudicrousDB\:\:add_callback\(\) has invalid type function\.$#'
+			identifier: class.notFound
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$allowed_charsets type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$bin_blobs type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$database_defaults type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$db_connections type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$dbh2host type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$dbhname_heartbeats type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$dbhs type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$last_connection type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$last_found_rows_result \(resource\) does not accept null\.$#'
+			identifier: assign.propertyType
+			count: 3
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$last_used_server type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$ludicrous_callbacks type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$ludicrous_servers type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$ludicrous_tables type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$open_connections type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$renamed_vars type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$send_reads_to_primaries type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$tcp_cache type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Property LudicrousDB\:\:\$used_servers type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 2
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Undefined variable\: \$server$#'
+			identifier: variable.undefined
+			count: 2
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Variable \$host might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Variable \$lagged_status might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Variable \$modes_str in empty\(\) always exists and is not falsy\.$#'
+			identifier: empty.variable
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Variable \$port might not be defined\.$#'
+			identifier: variable.undefined
+			count: 2
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Variable \$server in empty\(\) is never defined\.$#'
+			identifier: empty.variable
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Variable \$use_primary in empty\(\) is never defined\.$#'
+			identifier: empty.variable
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Variable \$use_primary in isset\(\) is never defined\.$#'
+			identifier: isset.variable
+			count: 1
+			path: ludicrousdb/includes/class-ludicrousdb.php
+
+		-
+			message: '#^Default value of the parameter \#11 \$timeout \(float\) of function ldb_add_db_server\(\) is incompatible with type int\.$#'
+			identifier: parameter.defaultValue
+			count: 1
+			path: ludicrousdb/includes/functions.php
+
+		-
+			message: '#^Function ldb_add_db_server\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/functions.php
+
+		-
+			message: '#^Function ldb_add_db_table\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/functions.php
+
+		-
+			message: '#^Function ldb_default_constants\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: ludicrousdb/includes/functions.php

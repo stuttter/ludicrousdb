@@ -49,7 +49,7 @@ class LudicrousDB extends wpdb {
 	 *
 	 * The current MySQL link resource.
 	 *
-	 * @var mysqli|resource|false|null Default null.
+	 * @var mysqli|false|null Default null.
 	 */
 	public $dbh = null;
 
@@ -261,63 +261,63 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @var null|int Default null. Might be zero or more.
 	 */
-	private $unique_servers = null;
+	public $unique_servers = null;
 
 	/**
 	 * Result of the last callback run.
 	 *
 	 * @var mixed Default null.
 	 */
-	private $callback_result = null;
+	public $callback_result = null;
 
 	/**
 	 * The current table being queried.
 	 *
 	 * @var string|null Default null.
 	 */
-	private $table = null;
+	public $table = null;
 
 	/**
 	 * The lag threshold for replica servers.
 	 *
 	 * @var float|null Default null.
 	 */
-	private $lag_threshold = null;
+	public $lag_threshold = null;
 
 	/**
 	 * The current database handle name.
 	 *
 	 * @var string|null Default null.
 	 */
-	private $dbhname = null;
+	public $dbhname = null;
 
 	/**
 	 * The current dataset being queried.
 	 *
 	 * @var string|null Default null.
 	 */
-	private $dataset = null;
+	public $dataset = null;
 
 	/**
 	 * The current host being connected to.
 	 *
 	 * @var string|null Default null.
 	 */
-	private $current_host = null;
+	public $current_host = null;
 
 	/**
 	 * The last database connection information.
 	 *
 	 * @var array|null Default null.
 	 */
-	private $last_connection = null;
+	public $last_connection = null;
 
 	/**
 	 * The cache key for lag information.
 	 *
 	 * @var string|null Default null.
 	 */
-	private $lag_cache_key = null;
+	public $lag_cache_key = null;
 
 	/**
 	 * Array of renamed class variables.
@@ -402,6 +402,9 @@ class LudicrousDB extends wpdb {
 		// Check if old var is in $class_vars_renamed
 		if ( isset( self::$renamed_vars[ $name ] ) ) {
 			$name = self::$renamed_vars[ $name ];
+
+			// Renamed properties may be private to this class.
+			return $this->{$name};
 		}
 
 		return parent::__get( $name );
@@ -420,6 +423,11 @@ class LudicrousDB extends wpdb {
 		// Check if old var is in $class_vars_renamed
 		if ( isset( self::$renamed_vars[ $name ] ) ) {
 			$name = self::$renamed_vars[ $name ];
+
+			// Renamed properties may be private to this class.
+			$this->{$name} = $value;
+
+			return;
 		}
 
 		parent::__set( $name, $value );
@@ -454,7 +462,7 @@ class LudicrousDB extends wpdb {
 
 			// Only compact if all params are not empty
 			if ( ! empty( $dbpassword ) && ! empty( $dbname ) && ! empty( $dbhost ) ) {
-				$class_vars = compact( $dbuser, $dbpassword, $dbname, $dbhost );
+				$class_vars = compact( 'dbuser', 'dbpassword', 'dbname', 'dbhost' );
 			}
 		}
 
@@ -741,15 +749,23 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $query Query.
+	 * @param bool|string $allow_bail Optional. Allows the function to bail. A query string preserves
+	 *                                the historical calling convention. Default true.
+	 * @param string      $query      Optional. Query used to select a LudicrousDB dataset.
 	 *
-	 * @return resource MySQL database connection
+	 * @return false|mysqli|resource MySQL database connection.
 	 */
-	public function db_connect( $query = '' ) {
+	public function db_connect( $allow_bail = true, $query = '' ) {
 
-		// Bail if empty query
+		// Preserve the historical db_connect( $query ) calling convention.
+		if ( is_string( $allow_bail ) && '' === $query ) {
+			$query      = $allow_bail;
+			$allow_bail = true;
+		}
+
+		// Core may call db_connect() before a query is available.
 		if ( empty( $query ) ) {
-			return false;
+			$query = 'SELECT 1';
 		}
 
 		// Fix error reporting change (in PHP 8.1) causing fatal errors
@@ -789,7 +805,9 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( empty( $dataset ) ) {
-			return $this->bail( "Unable to determine which dataset to query. ({$this->table})" );
+			return $allow_bail
+				? $this->bail( "Unable to determine which dataset to query. ({$this->table})" )
+				: false;
 		} else {
 			$this->dataset = $dataset;
 		}
@@ -813,7 +831,9 @@ class LudicrousDB extends wpdb {
 				||
 				! defined( 'DB_NAME' )
 			) {
-				return $this->bail( 'We were unable to query because there was no database defined.' );
+				return $allow_bail
+					? $this->bail( 'We were unable to query because there was no database defined.' )
+					: false;
 			}
 
 			// Fallback to wpdb::db_connect() method.
@@ -823,7 +843,7 @@ class LudicrousDB extends wpdb {
 			$this->dbname     = DB_NAME;
 			$this->dbhost     = DB_HOST;
 
-			parent::db_connect();
+			parent::db_connect( $allow_bail );
 
 			return $this->dbh;
 		}
@@ -970,12 +990,16 @@ class LudicrousDB extends wpdb {
 			&&
 			$this->is_primary_dead()
 		) {
-			return $this->bail( 'We are updating the database. Please try back in 5 minutes. If you are posting to your blog please hit the refresh button on your browser in a few minutes to post the data again. It will be posted as soon as the database is back online.' );
+			return $allow_bail
+				? $this->bail( 'We are updating the database. Please try back in 5 minutes. If you are posting to your blog please hit the refresh button on your browser in a few minutes to post the data again. It will be posted as soon as the database is back online.' )
+				: false;
 		}
 
 		// Bail if no servers available for table/dataset/operation
 		if ( empty( $this->ludicrous_servers[ $dataset ][ $operation ] ) ) {
-			return $this->bail( "No databases available with {$this->table} ({$dataset})" );
+			return $allow_bail
+				? $this->bail( "No databases available with {$this->table} ({$dataset})" )
+				: false;
 		}
 
 		// Put the operations in order by key
@@ -997,7 +1021,9 @@ class LudicrousDB extends wpdb {
 
 			$tries_remaining = count( $servers );
 			if ( 0 === $tries_remaining ) {
-				return $this->bail( "No database servers were found to match the query. ({$this->table}, {$dataset})" );
+				return $allow_bail
+					? $this->bail( "No database servers were found to match the query. ({$this->table}, {$dataset})" )
+					: false;
 			}
 
 			if ( is_null( $this->unique_servers ) ) {
@@ -1043,15 +1069,8 @@ class LudicrousDB extends wpdb {
 					$server = array();
 				}
 
-				// Maybe split host:port into $host and $port
-				if ( strpos( $host, ':' ) ) {
-					list( $host, $port ) = explode( ':', $host );
-				}
-
-				// Maybe use the default port number (usually: 3306)
-				if ( empty( $port ) ) {
-					$port = (int) $this->database_defaults['port'];
-				}
+				// Normalize host, port, and socket using wpdb's canonical parser.
+				list( $host, $port, $socket ) = $this->parse_database_host( $host, $port );
 
 				// Maybe use the default timeout (usually: 200ms)
 				if ( ! isset( $timeout ) ) {
@@ -1064,7 +1083,7 @@ class LudicrousDB extends wpdb {
 				}
 
 				// Format the cache key using the extracted host and port
-				$host_and_port = $this->tcp_get_cache_key( $host, $port );
+				$host_and_port = $this->tcp_get_cache_key( $host, $port, $socket );
 
 				// Can be used by the lag callbacks
 				$this->lag_cache_key = $host_and_port;
@@ -1108,7 +1127,7 @@ class LudicrousDB extends wpdb {
 
 				$this->timer_start();
 
-				$tcp = $this->check_tcp_responsiveness( $host, $port, $timeout );
+				$tcp = $this->check_tcp_responsiveness( $host, $port, $timeout, $socket );
 
 				// Connect if necessary or possible
 				if (
@@ -1176,7 +1195,7 @@ class LudicrousDB extends wpdb {
 							$queries = isset( $queries ) ? $queries : 1; // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
 							$lag     = isset( $this->lag ) ? $this->lag : 0;
 
-							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
+							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'socket', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
 							$this->db_connections[]   = $this->last_connection;
 							$this->open_connections[] = $dbhname;
 							$success                  = true;
@@ -1187,7 +1206,7 @@ class LudicrousDB extends wpdb {
 				}
 
 				$success                = false;
-				$this->last_connection  = compact( 'dbhname', 'host', 'port', 'user', 'name', 'tcp', 'elapsed', 'success' );
+				$this->last_connection  = compact( 'dbhname', 'host', 'port', 'socket', 'user', 'name', 'tcp', 'elapsed', 'success' );
 				$this->db_connections[] = $this->last_connection;
 
 				if ( $this->dbh_type_check( $this->dbhs[ $dbhname ] ) ) {
@@ -1258,7 +1277,9 @@ class LudicrousDB extends wpdb {
 
 				$this->run_callbacks( 'db_connection_error', $callback_data );
 
-				return $this->bail( "Unable to connect to {$host}:{$port} to {$operation} table '{$this->table}' ({$dataset})" );
+				return $allow_bail
+					? $this->bail( "Unable to connect to {$host}:{$port} to {$operation} table '{$this->table}' ({$dataset})" )
+					: false;
 			}
 
 			break;
@@ -1313,27 +1334,64 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
+	 * Normalize a database host while preserving the separately configured port.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param string $host Database host, optionally including a port or socket.
+	 * @param int    $port Separately configured port.
+	 * @return array{0: string, 1: int, 2: string, 3: bool} Host, port, socket, and IPv6 flag.
+	 */
+	protected function parse_database_host( $host, $port = 0 ) {
+		$host_data = $this->parse_db_host( $host );
+
+		if ( false === $host_data ) {
+			if ( empty( $port ) ) {
+				$port = (int) $this->database_defaults['port'];
+			}
+
+			return array( $host, (int) $port, '', false );
+		}
+
+		list( $host, $parsed_port, $socket, $is_ipv6 ) = $host_data;
+
+		if ( null !== $parsed_port ) {
+			$port = $parsed_port;
+		} elseif ( empty( $port ) ) {
+			$port = (int) $this->database_defaults['port'];
+		}
+
+		return array(
+			$host,
+			(int) $port,
+			null === $socket ? '' : $socket,
+			$is_ipv6,
+		);
+	}
+
+	/**
 	 * Connect selected database
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $dbhname Database name.
-	 * @param string $host Internet address: host:port of server on internet.
+	 * @param string $dbhname Database handle name.
+	 * @param string $host Internet address, including a port and optional socket.
 	 * @param string $user Database user.
 	 * @param string $password Database password.
 	 *
 	 * @return bool|mysqli|resource
 	 */
-
-    protected function single_db_connect(
-        $dbhname,
-        $host,
-        $user,
-        #[\SensitiveParameter]
-        $password
-    ) {
+	protected function single_db_connect(
+		$dbhname,
+		$host,
+		$user,
+		#[\SensitiveParameter]
+		$password
+	) {
 		$tcp_cache_key  = $host;
 		$this->is_mysql = true;
+
+		list( $host, $port, $socket, $is_ipv6 ) = $this->parse_database_host( $host );
 
 		// Check client flags
 		$client_flags = defined( 'MYSQL_CLIENT_FLAGS' )
@@ -1342,31 +1400,6 @@ class LudicrousDB extends wpdb {
 
 		// Initialize the database handle
 		$this->dbhs[ $dbhname ] = mysqli_init();
-
-		/**
-		 * mysqli_real_connect doesn't support the "host" param including a port
-		 * or socket like mysql_connect does. This duplicates how mysql_connect
-		 * detects a port and/or socket file.
-		 */
-		$port           = 0;
-		$socket         = '';
-		$port_or_socket = strstr( $host, ':' );
-
-		if ( ! empty( $port_or_socket ) ) {
-			$host           = substr( $host, 0, strpos( $host, ':' ) );
-			$port_or_socket = substr( $port_or_socket, 1 );
-
-			if ( 0 !== strpos( $port_or_socket, '/' ) ) {
-				$port         = intval( $port_or_socket );
-				$maybe_socket = strstr( $port_or_socket, ':' );
-
-				if ( ! empty( $maybe_socket ) ) {
-					$socket = substr( $maybe_socket, 1 );
-				}
-			} else {
-				$socket = $port_or_socket;
-			}
-		}
 
 		/**
 		 * If DB_HOST begins with a 'p:', allow it to be passed to
@@ -1381,6 +1414,11 @@ class LudicrousDB extends wpdb {
 			$pre_host = 'p:';
 		} else {
 			$pre_host = '';
+		}
+
+		// mysqlnd requires brackets around IPv6 addresses.
+		if ( $is_ipv6 && extension_loaded( 'mysqlnd' ) ) {
+			$host = "[{$host}]";
 		}
 
 		// Connect to the database
@@ -1480,13 +1518,18 @@ class LudicrousDB extends wpdb {
 	 * @since 1.0.0
 	 *
 	 * @param string                       $db           MySQL database name.
-	 * @param false|string|mysqli|resource $dbh_or_table Optional. The database. One of:
-	 *                                                   - the current database
-	 *                                                   - the database housing the specified table
-	 *                                                   - the database of the MySQL resource
+	 * @param false|string|mysqli|resource $dbh          Optional. Database handle or, for backward
+	 *                                                   compatibility, a table name.
+	 * @param false|string|mysqli|resource $dbh_or_table Optional. Historical named-argument alias.
 	 */
-	public function select( $db, $dbh_or_table = false ) {
-		$dbh = $this->get_db_object( $dbh_or_table );
+	public function select( $db, $dbh = null, $dbh_or_table = null ) {
+
+		// Prefer the historical named argument when explicitly supplied.
+		if ( null !== $dbh_or_table ) {
+			$dbh = $dbh_or_table;
+		}
+
+		$dbh = $this->get_db_object( null === $dbh ? false : $dbh );
 
 		if ( ! $this->dbh_type_check( $dbh ) ) {
 			return false;
@@ -1539,17 +1582,23 @@ class LudicrousDB extends wpdb {
 	 * See set_charset().
 	 *
 	 * @since 1.0.0
-	 * @param string $to_escape String to escape.
+	 * @param string $data      String to escape.
+	 * @param mixed  $to_escape Historical named-argument alias.
 	 */
-	public function _real_escape( $to_escape = '' ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
+	public function _real_escape( $data = '', $to_escape = null ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore
+
+		// Preserve callers using the old $to_escape named argument.
+		if ( null !== $to_escape ) {
+			$data = $to_escape;
+		}
 
 		// Bail if not a scalar
-		if ( ! is_scalar( $to_escape ) ) {
+		if ( ! is_scalar( $data ) ) {
 			return '';
 		}
 
 		// Slash the query part
-		$escaped = addslashes( $to_escape );
+		$escaped = addslashes( $data );
 
 		// Maybe use WordPress core placeholder method
 		if ( method_exists( $this, 'add_placeholder_escape' ) ) {
@@ -1664,13 +1713,20 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param bool   $die_on_disconnect Optional. Allows the function to die. Default true.
-	 * @param bool   $dbh_or_table      Optional.
-	 * @param string $query             Optional. Query string passed db_connect
+	 * @param bool                         $allow_bail        Optional. Allows the function to bail. Default true.
+	 * @param false|string|mysqli|resource $dbh_or_table      Optional. Database handle or table name.
+	 * @param string                       $query             Optional. Query string passed to db_connect().
+	 * @param bool|null                    $die_on_disconnect Historical named-argument alias.
 	 *
 	 * @return bool|void True if the connection is up.
 	 */
-	public function check_connection( $die_on_disconnect = true, $dbh_or_table = false, $query = '' ) {
+	public function check_connection( $allow_bail = true, $dbh_or_table = false, $query = '', $die_on_disconnect = null ) {
+
+		// Preserve callers using the old $die_on_disconnect named argument.
+		if ( null !== $die_on_disconnect ) {
+			$allow_bail = $die_on_disconnect;
+		}
+
 		$dbh = $this->get_db_object( $dbh_or_table );
 
 		// Return true if connection is alive. This is the most common case.
@@ -1718,7 +1774,7 @@ class LudicrousDB extends wpdb {
 		for ( $tries = 1; $tries <= $this->reconnect_retries; $tries++ ) {
 
 			// Try to reconnect
-			$retry = $this->db_connect( $query );
+			$retry = $this->db_connect( false, $query );
 
 			// Return true if the connection is up
 			if ( false !== $retry ) {
@@ -1736,11 +1792,11 @@ class LudicrousDB extends wpdb {
 			}
 
 			// Sleep before retrying
-			sleep( $this->reconnect_sleep );
+			usleep( (int) ( $this->reconnect_sleep * 1000000 ) );
 		}
 
 		// Bail here if not allowed to call $this->bail()
-		if ( false === $die_on_disconnect ) {
+		if ( false === $allow_bail ) {
 			return false;
 		}
 
@@ -1946,6 +2002,11 @@ class LudicrousDB extends wpdb {
 		}
 
 		if ( ! empty( $this->last_error ) ) {
+			// Clear insert_id on a subsequent failed insert.
+			if ( $this->insert_id && preg_match( '/^\s*(insert|replace)\s/i', $query ) ) {
+				$this->insert_id = 0;
+			}
+
 			$this->print_error( $this->last_error );
 			$retval = false;
 
@@ -2139,6 +2200,12 @@ class LudicrousDB extends wpdb {
 	 * @return bool
 	 */
 	public function has_cap( $db_cap, $dbh_or_table = false ) {
+
+		// This capability belongs to wpdb::prepare(), not to a database server.
+		if ( 'identifier_placeholders' === strtolower( $db_cap ) ) {
+			return parent::has_cap( $db_cap );
+		}
+
 		$db_version     = $this->db_version( $dbh_or_table );
 		$db_server_info = $this->db_server_info( $dbh_or_table );
 
@@ -2149,7 +2216,11 @@ class LudicrousDB extends wpdb {
 			&&
 			( false !== strpos( $db_server_info, 'MariaDB' ) )
 			&&
-			version_compare( phpversion(), '8.0.16', '<' ) // PHP 8.0.15 or older.
+			(
+				PHP_VERSION_ID <= 80015 // PHP 8.0.15 or older.
+				||
+				( 80100 <= PHP_VERSION_ID && PHP_VERSION_ID <= 80102 ) // PHP 8.1.0 to PHP 8.1.2.
+			)
 		) {
 			// Strip the '5.5.5-' prefix and set the version to the correct value.
 			$db_server_info = preg_replace( '/^5\.5\.5-(.*)/', '$1', $db_server_info );
@@ -2370,16 +2441,30 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param  string $host Host.
-	 * @param  int    $port Port or socket.
-	 * @param  float  $float_timeout Timeout in seconds, as float number ().
+	 * @param string $host          Host.
+	 * @param int    $port          Port.
+	 * @param float  $float_timeout Timeout in seconds.
+	 * @param string $socket        Optional. Unix socket path.
 	 *
-	 * @return bool true when $host:$post responds within $float_timeout seconds, else false
+	 * @return bool True when the database endpoint responds within the timeout, otherwise false.
 	 */
-	public function check_tcp_responsiveness( $host, $port, $float_timeout ) {
+	public function check_tcp_responsiveness( $host, $port, $float_timeout, $socket = '' ) {
+
+		// Honor raw host strings passed by integrations calling this method directly.
+		list( $host, $port, $parsed_socket, $is_ipv6 ) = $this->parse_database_host( $host, $port );
+
+		if ( empty( $socket ) ) {
+			$socket = $parsed_socket;
+		}
+
+		if ( empty( $this->check_tcp_responsiveness ) ) {
+			$this->tcp_responsive = true;
+
+			return true;
+		}
 
 		// Get the cache key
-		$cache_key = $this->tcp_get_cache_key( $host, $port );
+		$cache_key = $this->tcp_get_cache_key( $host, $port, $socket );
 
 		// Persistent cached value exists
 		$cached_value = $this->tcp_cache_get( $cache_key );
@@ -2395,24 +2480,23 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		if ( empty( $this->check_tcp_responsiveness ) ) {
-			$this->tcp_responsive = true;
-			return true;
-		}
-
 		// Defaults
 		$errno  = 0;
 		$errstr = '';
+		$target = empty( $socket )
+			? ( $is_ipv6 ? "tcp://[{$host}]" : $host )
+			: 'unix://' . $socket;
+		$port   = empty( $socket ) ? $port : -1;
 
 		// Try to get a new socket
 		// phpcs:disable
-		$socket = $this->is_debug()
-			? fsockopen( $host, $port, $errno, $errstr, $float_timeout )
-			: @fsockopen( $host, $port, $errno, $errstr, $float_timeout );
+		$connection = $this->is_debug()
+			? fsockopen( $target, $port, $errno, $errstr, $float_timeout )
+			: @fsockopen( $target, $port, $errno, $errstr, $float_timeout );
 		// phpcs:enable
 
 		// No socket
-		if ( false === $socket ) {
+		if ( false === $connection ) {
 			$this->tcp_cache_set( $cache_key, 'down' );
 			$this->tcp_responsive = false;
 
@@ -2421,7 +2505,7 @@ class LudicrousDB extends wpdb {
 
 		// Close the socket
 		// phpcs:ignore
-		fclose( $socket );
+		fclose( $connection );
 
 		// Using API
 		$this->tcp_cache_set( $cache_key, 'up' );
@@ -2757,13 +2841,17 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 3.0.0
 	 *
-	 * @param string $host Host
-	 * @param string $port Port or socket.
+	 * @param string     $host   Host.
+	 * @param int|string $port   Port.
+	 * @param string     $socket Optional. Unix socket path.
 	 *
 	 * @return string
 	 */
-	protected function tcp_get_cache_key( $host, $port ) {
-		return "{$host}:{$port}";
+	protected function tcp_get_cache_key( $host, $port, $socket = '' ) {
+		$host = substr_count( $host, ':' ) > 1 ? "[{$host}]" : $host;
+		$key  = "{$host}:{$port}";
+
+		return empty( $socket ) ? $key : "{$key}:{$socket}";
 	}
 
 	/**

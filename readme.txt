@@ -6,9 +6,9 @@ Plugin URI:        https://github.com/stuttter/ludicrousdb/
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 License:           GPLv2 or later
 Tags:              database, mysql, performance, scaling, wpdb
-Requires PHP:      7.0
-Requires at least: 5.0
-Tested up to:      6.5
+Requires PHP:      7.4
+Requires at least: 6.4
+Tested up to:      7.1
 Stable tag:        5.3.0
 
 LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
@@ -83,6 +83,7 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 == Changelog ==
 
 = 5.3.0 =
+* Raise the minimum supported WordPress version to 6.4
 * Fix unnecessary pings and add retry queries
 * Fix that if check_tcp_responsiveness is disabled, time is wasted by looping over all possible servers while the last one is used instead of the first possible one
 * Fix PHP 8.4 mysqli_ping deprecation and error code change

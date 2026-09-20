@@ -51,4 +51,5 @@
 	<file>.</file>
 
 	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/build/*</exclude-pattern>
 </ruleset>
