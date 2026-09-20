@@ -2153,6 +2153,8 @@ class LudicrousDB extends wpdb {
 	 *                                                   - the database housing the specified table
 	 *                                                   - the database of the MySQL resource
 	 *
+	 * @throws Error If mysqli_close() reports an error other than an already-closed handle.
+	 *
 	 * @return bool True if the connection was successfully closed. False if it wasn't
 	 *              or the connection doesn't exist.
 	 */
@@ -2163,9 +2165,41 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
-		$closed = mysqli_close( $dbh );
+		$already_closed         = false;
+		$previous_error_handler = null;
 
-		if ( ! empty( $closed ) ) {
+		// PHP 7.4 emits a warning when a stale mysqli object is already closed.
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- Normalize PHP 7.4's warning with PHP 8's exception for this call only.
+		$previous_error_handler = set_error_handler(
+			static function ( $error_level, $error_message, $error_file, $error_line ) use ( &$already_closed, &$previous_error_handler ) {
+				if ( false !== strpos( $error_message, "mysqli_close(): Couldn't fetch mysqli" ) ) {
+					$already_closed = true;
+					return true;
+				}
+
+				if ( is_callable( $previous_error_handler ) ) {
+					return (bool) call_user_func( $previous_error_handler, $error_level, $error_message, $error_file, $error_line );
+				}
+
+				return false;
+			},
+			E_WARNING
+		);
+
+		try {
+			$closed = mysqli_close( $dbh );
+		} catch ( Error $exception ) {
+			if ( 'mysqli object is already closed' !== $exception->getMessage() ) {
+				throw $exception;
+			}
+
+			$already_closed = true;
+			$closed         = false;
+		} finally {
+			restore_error_handler();
+		}
+
+		if ( ! empty( $closed ) || $already_closed ) {
 			$this->dbh = null;
 		}
 
