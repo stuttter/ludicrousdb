@@ -214,6 +214,39 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Connection checks actively verify a handle instead of trusting stale state.
+	 */
+	public function test_check_connection_uses_an_active_probe() {
+		$database                          = new LudicrousDBTestDouble();
+		$database->connection_probe_result = true;
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is required for a deterministic liveness test.
+		$database->dbh = mysqli_init();
+
+		$database->dbhs['global__r'] = $database->dbh;
+
+		$this->assertTrue( $database->check_connection( false, $database->dbh ) );
+		$this->assertSame( array( 'probe' ), $database->connection_events );
+	}
+
+	/**
+	 * A failed probe removes the stale handle before attempting reconnection.
+	 */
+	public function test_check_connection_disconnects_before_reconnecting() {
+		$database                          = new LudicrousDBTestDouble();
+		$database->connection_probe_result = false;
+		$database->reconnect_retries       = 1;
+		$database->reconnect_sleep         = 0;
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is required for a deterministic liveness test.
+		$database->dbh = mysqli_init();
+
+		$database->dbhs['global__r'] = $database->dbh;
+
+		$this->assertFalse( $database->check_connection( false, $database->dbh, 'SELECT * FROM wp_posts' ) );
+		$this->assertSame( array( 'probe', 'disconnect', 'reconnect' ), $database->connection_events );
+		$this->assertArrayNotHasKey( 'global__r', $database->dbhs );
+	}
+
+	/**
 	 * Identifier placeholders track the installed wpdb implementation.
 	 */
 	public function test_identifier_placeholder_capability_comes_from_wpdb() {

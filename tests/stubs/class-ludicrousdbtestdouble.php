@@ -5,6 +5,20 @@
  */
 class LudicrousDBTestDouble extends LudicrousDB {
 	/**
+	 * Result returned by the connection probe, or null to use the real probe.
+	 *
+	 * @var bool|null
+	 */
+	public $connection_probe_result = null;
+
+	/**
+	 * Ordered connection events observed by the test double.
+	 *
+	 * @var array
+	 */
+	public $connection_events = array();
+
+	/**
 	 * Expose host normalization.
 	 *
 	 * @param string $host Database host.
@@ -25,5 +39,54 @@ class LudicrousDBTestDouble extends LudicrousDB {
 	 */
 	public function tcp_cache_key_for_test( $host, $port, $socket ) {
 		return $this->tcp_get_cache_key( $host, $port, $socket );
+	}
+
+	/**
+	 * Return a deterministic connection probe result when configured.
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return bool
+	 */
+	protected function is_connection_alive( $dbh ) {
+		if ( null !== $this->connection_probe_result ) {
+			$this->connection_events[] = 'probe';
+
+			return $this->connection_probe_result;
+		}
+
+		return parent::is_connection_alive( $dbh );
+	}
+
+	/**
+	 * Record stale-handle removal without closing the test handle.
+	 *
+	 * @param string $dbhname Database handle name.
+	 */
+	public function disconnect( $dbhname ) {
+		if ( null !== $this->connection_probe_result ) {
+			$this->connection_events[] = 'disconnect';
+			unset( $this->dbhs[ $dbhname ] );
+
+			return;
+		}
+
+		parent::disconnect( $dbhname );
+	}
+
+	/**
+	 * Record reconnect attempts made after a failed probe.
+	 *
+	 * @param bool   $allow_bail Whether fatal handling is allowed.
+	 * @param string $query      Query that requested the connection.
+	 * @return bool|mysqli|resource
+	 */
+	public function db_connect( $allow_bail = true, $query = '' ) {
+		if ( null !== $this->connection_probe_result ) {
+			$this->connection_events[] = 'reconnect';
+
+			return false;
+		}
+
+		return parent::db_connect( $allow_bail, $query );
 	}
 }

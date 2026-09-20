@@ -1731,33 +1731,16 @@ class LudicrousDB extends wpdb {
 
 		// Return true if connection is alive. This is the most common case.
 		if ( $this->dbh_type_check( $dbh ) ) {
-			$mysql_errno = mysqli_errno( $dbh );
-
-			/*
-			 * Check connection health based on the last MySQL error code.
-			 * Unlike mysqli_ping() which actively tests the connection, we check
-			 * the error state from the last operation:
-			 *
-			 * - errno 0: No error, connection is healthy (or no operations performed yet)
-			 * - errno 2006 (DB_SERVER_GONE_ERROR): Server has gone away, reconnect needed
-			 * - errno 4031 (DB_SERVER_LOST_ERROR): Connection was lost, reconnect needed
-			 * - Other errno: Query/operation error, but connection is still alive
-			 *
-			 * Note: This passive approach means a stale connection with no operations
-			 * may be considered alive until the next query reveals otherwise. This is
-			 * an acceptable trade-off to avoid the deprecated mysqli_ping() function.
-			 */
-			if ( 0 === $mysql_errno ) {
+			if ( $this->is_connection_alive( $dbh ) ) {
 				$this->update_heartbeat( $dbh );
+
 				return true;
 			}
 
-			// If there's a "server gone away" error, the connection is dead and needs reconnection.
-			// Let execution continue to reconnection logic below.
-			if ( ! in_array( $mysql_errno, array( DB_SERVER_GONE_ERROR, DB_SERVER_LOST_ERROR ), true ) ) {
-				// Other errors (query errors, etc.) don't indicate a dead connection.
-				// Consider the connection alive but don't update heartbeat.
-				return true;
+			// Remove the stale handle before db_connect() attempts a replacement.
+			$dbhname = $this->lookup_dbhs_name( $dbh );
+			if ( false !== $dbhname ) {
+				$this->disconnect( $dbhname );
 			}
 		}
 
@@ -1831,6 +1814,27 @@ class LudicrousDB extends wpdb {
 		// Call dead_db() if bail didn't die, because this database is no more.
 		// It has ceased to be (at least temporarily).
 		dead_db();
+	}
+
+	/**
+	 * Actively verify that a MySQL connection is usable.
+	 *
+	 * The mysqli_ping() function is deprecated as of PHP 8.4. A harmless statement provides
+	 * the same liveness check without relying on the deprecated API or a stale
+	 * error code left by an earlier query.
+	 *
+	 * @since 5.4.0
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return bool Whether the connection responded.
+	 */
+	protected function is_connection_alive( $dbh ) {
+		try {
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- A failed probe is handled as a reconnect signal.
+			return false !== @mysqli_query( $dbh, 'DO 1' );
+		} catch ( Throwable $exception ) {
+			return false;
+		}
 	}
 
 	/**
@@ -3033,9 +3037,9 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @since 5.0.0
 	 *
-	 * @param object $dbh The dbh object for which to find the dbh name
+	 * @param object|false $dbh The dbh object for which to find the dbh name.
 	 *
-	 * @return string The dbh name
+	 * @return string|false The dbh name, or false when the handle is unknown.
 	 */
 	private function lookup_dbhs_name( $dbh = false ) {
 
