@@ -6,10 +6,10 @@ Plugin URI:        https://github.com/stuttter/ludicrousdb/
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 License:           GPLv2 or later
 Tags:              database, mysql, performance, scaling, wpdb
-Requires PHP:      7.0
+Requires PHP:      7.4
 Requires at least: 5.0
 Tested up to:      6.5
-Stable tag:        5.3.0
+Stable tag:        5.3.1
 
 LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
 
@@ -81,6 +81,9 @@ One way LudicrousDB differs from WPDB is that LudicrousDB does not attempt to co
 Since LudicrousDB attempts a connection only when a query is made, your WordPress installation will not kill the site with a database error, but will let the code decide what to do next on an unsuccessful query. If you want to do something different, like setting a custom error page or kill the site, you need to define the 'db_connection_error' callback in your db-config.php.
 
 == Changelog ==
+
+= 5.3.1 =
+* Initialize the database character set before connecting and support WordPress's default empty DB_COLLATE value.
 
 = 5.3.0 =
 * Fix unnecessary pings and add retry queries
