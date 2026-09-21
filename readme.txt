@@ -83,7 +83,8 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 == Changelog ==
 
 = 5.3.1 =
-* Initialize the database character set before connecting and support WordPress's default empty DB_COLLATE value.
+* Initialize the database character set from WordPress settings, resolve supported collations on the first connection, and preserve explicit db-config.php settings.
+* Support WordPress's default empty DB_COLLATE value without choosing a replacement character set when DB_CHARSET is empty.
 
 = 5.3.0 =
 * Fix unnecessary pings and add retry queries

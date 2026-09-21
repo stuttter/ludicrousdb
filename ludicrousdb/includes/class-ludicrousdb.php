@@ -362,6 +362,20 @@ class LudicrousDB extends wpdb {
 	);
 
 	/**
+	 * Charset settings from WordPress before constructor or db-config overrides.
+	 *
+	 * @var array
+	 */
+	private $initial_charset_collate = array();
+
+	/**
+	 * Whether the initial charset has been checked against a live server.
+	 *
+	 * @var bool
+	 */
+	private $charset_determined = false;
+
+	/**
 	 * Gets ready to make database connections
 	 *
 	 * @since 1.0.0
@@ -382,11 +396,17 @@ class LudicrousDB extends wpdb {
 		// Start the TCP cache
 		$this->tcp_cache_start();
 
+		// Initialize from WordPress constants before applying explicit overrides.
+		$this->init_charset();
+		$initial_charset_collate = array(
+			'charset' => $this->charset,
+			'collate' => $this->collate,
+		);
+
 		// Prepare class vars
 		$this->prepare_class_vars( $dbuser, $dbpassword, $dbname, $dbhost );
-
-		// Initialize charset and collation before connecting.
-		$this->init_charset();
+		$this->initial_charset_collate = $initial_charset_collate;
+		$this->charset_determined      = false;
 	}
 
 	/**
@@ -525,12 +545,16 @@ class LudicrousDB extends wpdb {
 	 */
 	public function init_charset() {
 
-		// Defaults
-		$charset = 'utf8mb4';
-		$collate = 'utf8mb4_unicode_520_ci';
+		// Match wpdb when the constants are absent, including multisite.
+		$charset = '';
+		$collate = '';
 
-		// Use constant if defined
-		if ( defined( 'DB_COLLATE' ) ) {
+		if ( function_exists( 'is_multisite' ) && is_multisite() ) {
+			$charset = 'utf8';
+			$collate = defined( 'DB_COLLATE' ) && DB_COLLATE
+				? DB_COLLATE
+				: 'utf8_general_ci';
+		} elseif ( defined( 'DB_COLLATE' ) ) {
 			$collate = DB_COLLATE;
 		}
 
@@ -1264,9 +1288,26 @@ class LudicrousDB extends wpdb {
 			break;
 		} while ( true );
 
-		$this->set_charset( $this->dbhs[ $dbhname ] );
+		$this->dbh = $this->dbhs[ $dbhname ]; // needed by $wpdb->_real_escape()
 
-		$this->dbh                      = $this->dbhs[ $dbhname ]; // needed by $wpdb->_real_escape()
+		// Determine WordPress defaults only after a live connection exists.
+		// Explicit constructor and db-config settings must remain unchanged.
+		if ( false === $this->charset_determined ) {
+			if (
+				$this->charset === $this->initial_charset_collate['charset']
+				&&
+				$this->collate === $this->initial_charset_collate['collate']
+			) {
+				$charset_collate = $this->determine_charset( $this->charset, $this->collate );
+
+				$this->charset = $charset_collate['charset'];
+				$this->collate = $charset_collate['collate'];
+			}
+			$this->charset_determined = true;
+		}
+
+		$this->set_charset( $this->dbh );
+
 		$this->last_used_server         = compact( 'host', 'user', 'name', 'write', 'read' );
 		$this->used_servers[ $dbhname ] = $this->last_used_server;
 
