@@ -53,6 +53,16 @@ if ( $connection_charset !== $fresh->get_var( 'SELECT @@character_set_connection
 	throw new RuntimeException( 'An empty charset changed the connection character set.' );
 }
 
+// Reinitializing without an active handle must not strand the resolved state.
+$fresh->disconnect( 'global__r' );
+$fresh->dbh = null;
+$fresh->init_charset();
+$fresh->get_var( 'SELECT 1' );
+
+if ( $expected['charset'] !== $fresh->charset || $expected['collate'] !== $fresh->collate ) {
+	throw new RuntimeException( 'Reinitialization did not resolve the live connection.' );
+}
+
 if ( is_multisite() && 1 > (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->blogs}" ) ) {
 	throw new RuntimeException( 'The multisite network is not readable.' );
 }

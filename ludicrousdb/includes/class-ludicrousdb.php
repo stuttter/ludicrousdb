@@ -366,7 +366,10 @@ class LudicrousDB extends wpdb {
 	 *
 	 * @var array
 	 */
-	private $initial_charset_collate = array();
+	private $initial_charset_collate = array(
+		'charset' => '',
+		'collate' => '',
+	);
 
 	/**
 	 * Whether the initial charset has been checked against a live server.
@@ -398,15 +401,9 @@ class LudicrousDB extends wpdb {
 
 		// Initialize from WordPress constants before applying explicit overrides.
 		$this->init_charset();
-		$initial_charset_collate = array(
-			'charset' => $this->charset,
-			'collate' => $this->collate,
-		);
 
 		// Prepare class vars
 		$this->prepare_class_vars( $dbuser, $dbpassword, $dbname, $dbhost );
-		$this->initial_charset_collate = $initial_charset_collate;
-		$this->charset_determined      = false;
 	}
 
 	/**
@@ -569,6 +566,9 @@ class LudicrousDB extends wpdb {
 		// Set charset and collate
 		$this->charset = $charset_collate['charset'];
 		$this->collate = $charset_collate['collate'];
+
+		$this->initial_charset_collate = $charset_collate;
+		$this->charset_determined      = false;
 	}
 
 	/**
@@ -1288,7 +1288,8 @@ class LudicrousDB extends wpdb {
 			break;
 		} while ( true );
 
-		$this->dbh = $this->dbhs[ $dbhname ]; // needed by $wpdb->_real_escape()
+		// Charset capability checks and _real_escape() need the live handle.
+		$this->dbh = $this->dbhs[ $dbhname ];
 
 		// Determine WordPress defaults only after a live connection exists.
 		// Explicit constructor and db-config settings must remain unchanged.
