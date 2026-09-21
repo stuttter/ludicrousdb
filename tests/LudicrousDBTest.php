@@ -298,6 +298,22 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * The boolean probe wrapper retains its bounded busy-connection behavior.
+	 */
+	public function test_connection_probe_wrapper_bounds_busy_connection_grace() {
+		$database                          = new LudicrousDBTestDouble();
+		$statuses                          = $database->connection_statuses_for_test();
+		$database->connection_probe_status = $statuses['busy'];
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is sufficient because the status probe is deterministic.
+		$dbh = mysqli_init();
+
+		$this->assertTrue( $database->is_connection_alive_for_test( $dbh ) );
+		$this->assertFalse( $database->is_connection_alive_for_test( $dbh ) );
+		$database->clear_busy_connection_probe_for_test( $dbh );
+		$this->assertTrue( $database->is_connection_alive_for_test( $dbh ) );
+	}
+
+	/**
 	 * Closing a handle clears its request-local busy-probe state.
 	 */
 	public function test_closing_connection_clears_busy_probe_grace() {

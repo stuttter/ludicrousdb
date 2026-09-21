@@ -1838,6 +1838,8 @@ class LudicrousDB extends wpdb {
 				$this->release_connection_aliases( $dbh );
 				$this->clear_busy_connection_probe( $dbh );
 			} else {
+				$this->clear_busy_connection_probe( $dbh );
+
 				// Remove the stale handle before db_connect() attempts a replacement.
 				$dbhname = $this->lookup_dbhs_name( $dbh );
 				if ( false !== $dbhname ) {
@@ -1959,8 +1961,8 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Actively verify that a MySQL connection is alive.
 	 *
-	 * This compatibility wrapper retains the historical boolean result and one
-	 * grace probe for a live handle with pending results. Internal routing uses
+	 * This boolean convenience wrapper retains one grace probe for a live handle
+	 * with pending results. Internal routing uses
 	 * get_connection_status() so that a busy handle is never mistaken for an
 	 * immediately reusable one.
 	 *
