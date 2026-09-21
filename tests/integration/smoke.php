@@ -27,7 +27,32 @@ $database = new class( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST ) extends Ludicrou
 	public function probe( $dbh ) {
 		return $this->is_connection_alive( $dbh );
 	}
+
+	/**
+	 * Return the current connection status.
+	 *
+	 * @param mysqli|resource $dbh Database handle.
+	 * @return int One of the connection status constants.
+	 */
+	public function status( $dbh ) {
+		return $this->get_connection_status( $dbh );
+	}
+
+	/**
+	 * Return the connection status constants used by this probe.
+	 *
+	 * @return array{dead: int, available: int, busy: int}
+	 */
+	public function statuses() {
+		return array(
+			'dead'      => self::CONNECTION_DEAD,
+			'available' => self::CONNECTION_AVAILABLE,
+			'busy'      => self::CONNECTION_BUSY,
+		);
+	}
 };
+
+$statuses = $database->statuses();
 
 $database->suppress_errors = true;
 $database->recheck_timeout = 0;
@@ -41,13 +66,13 @@ $database->add_database(
 );
 
 $healthy = $database->db_connect( false, 'SELECT 1' );
-if ( ! ( $healthy instanceof mysqli ) || ! $database->probe( $healthy ) ) {
+if ( ! ( $healthy instanceof mysqli ) || $statuses['available'] !== $database->status( $healthy ) || ! $database->probe( $healthy ) ) {
 	throw new RuntimeException( 'LudicrousDB did not establish a healthy database connection.' );
 }
 
 // phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_close -- Intentionally force the reconnect path against the live database.
 mysqli_close( $healthy );
-if ( $database->probe( $healthy ) ) {
+if ( $statuses['dead'] !== $database->status( $healthy ) || $database->probe( $healthy ) ) {
 	throw new RuntimeException( 'LudicrousDB accepted a closed database connection.' );
 }
 
@@ -65,7 +90,7 @@ $unbuffered_result = mysqli_query( $replacement, 'SELECT 1 UNION ALL SELECT 2', 
 if ( ! ( $unbuffered_result instanceof mysqli_result ) ) {
 	throw new RuntimeException( 'LudicrousDB could not create an unbuffered result.' );
 }
-if ( ! $database->probe( $replacement ) ) {
+if ( $statuses['busy'] !== $database->status( $replacement ) || ! $database->probe( $replacement ) ) {
 	throw new RuntimeException( 'LudicrousDB treated an unbuffered live connection as disconnected.' );
 }
 // phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_errno -- Confirm the probe observed the expected busy-connection client error.
@@ -150,7 +175,7 @@ if ( $first_result instanceof mysqli_result ) {
 	$first_result->free();
 }
 // phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_more_results -- Confirm that the connection has a pending result before probing it.
-if ( ! mysqli_more_results( $replacement ) || ! $database->probe( $replacement ) ) {
+if ( ! mysqli_more_results( $replacement ) || $statuses['busy'] !== $database->status( $replacement ) || ! $database->probe( $replacement ) ) {
 	throw new RuntimeException( 'LudicrousDB treated a connection with pending results as disconnected.' );
 }
 // phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_errno -- Confirm the probe observed the expected busy-connection client error.

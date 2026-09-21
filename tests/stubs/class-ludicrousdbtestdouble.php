@@ -5,11 +5,11 @@
  */
 class LudicrousDBTestDouble extends LudicrousDB {
 	/**
-	 * Result returned by the connection probe, or null to use the real probe.
+	 * Status returned by the connection probe, or null to use the real probe.
 	 *
-	 * @var bool|null
+	 * @var int|null
 	 */
-	public $connection_probe_result = null;
+	public $connection_probe_status = null;
 
 	/**
 	 * Ordered connection events observed by the test double.
@@ -49,19 +49,42 @@ class LudicrousDBTestDouble extends LudicrousDB {
 	}
 
 	/**
-	 * Return a deterministic connection probe result when configured.
+	 * Return a deterministic connection probe status when configured.
 	 *
 	 * @param mysqli|resource $dbh Database connection.
-	 * @return bool
+	 * @return int
 	 */
-	protected function is_connection_alive( $dbh ) {
-		if ( null !== $this->connection_probe_result ) {
+	protected function get_connection_status( $dbh ) {
+		if ( null !== $this->connection_probe_status ) {
 			$this->connection_events[] = 'probe';
 
-			return $this->connection_probe_result;
+			return $this->connection_probe_status;
 		}
 
-		return parent::is_connection_alive( $dbh );
+		return parent::get_connection_status( $dbh );
+	}
+
+	/**
+	 * Return the connection status constants for assertions.
+	 *
+	 * @return array{dead: int, available: int, busy: int}
+	 */
+	public function connection_statuses_for_test() {
+		return array(
+			'dead'      => self::CONNECTION_DEAD,
+			'available' => self::CONNECTION_AVAILABLE,
+			'busy'      => self::CONNECTION_BUSY,
+		);
+	}
+
+	/**
+	 * Exercise the real connection status probe from tests.
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return int One of the CONNECTION_* status constants.
+	 */
+	public function get_connection_status_for_test( $dbh ) {
+		return parent::get_connection_status( $dbh );
 	}
 
 	/**
@@ -120,7 +143,7 @@ class LudicrousDBTestDouble extends LudicrousDB {
 	 * @param string $dbhname Database handle name.
 	 */
 	public function disconnect( $dbhname ) {
-		if ( null !== $this->connection_probe_result ) {
+		if ( null !== $this->connection_probe_status ) {
 			$this->connection_events[] = 'disconnect';
 			unset( $this->dbhs[ $dbhname ] );
 
@@ -150,7 +173,7 @@ class LudicrousDBTestDouble extends LudicrousDB {
 	 * @return bool|mysqli|resource
 	 */
 	public function db_connect( $allow_bail = true, $query = '' ) {
-		if ( null !== $this->connection_probe_result ) {
+		if ( null !== $this->connection_probe_status ) {
 			$this->connection_events[] = 'reconnect';
 
 			return false;

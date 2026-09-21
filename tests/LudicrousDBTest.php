@@ -218,7 +218,8 @@ final class LudicrousDBTest extends TestCase {
 	 */
 	public function test_check_connection_uses_an_active_probe() {
 		$database                          = new LudicrousDBTestDouble();
-		$database->connection_probe_result = true;
+		$statuses                          = $database->connection_statuses_for_test();
+		$database->connection_probe_status = $statuses['available'];
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is required for a deterministic liveness test.
 		$database->dbh = mysqli_init();
 
@@ -233,7 +234,8 @@ final class LudicrousDBTest extends TestCase {
 	 */
 	public function test_check_connection_disconnects_before_reconnecting() {
 		$database                          = new LudicrousDBTestDouble();
-		$database->connection_probe_result = false;
+		$statuses                          = $database->connection_statuses_for_test();
+		$database->connection_probe_status = $statuses['dead'];
 		$database->reconnect_retries       = 1;
 		$database->reconnect_sleep         = 0;
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is required for a deterministic liveness test.
@@ -251,9 +253,11 @@ final class LudicrousDBTest extends TestCase {
 	 */
 	public function test_connection_probe_rejects_an_unconnected_handle() {
 		$database = new LudicrousDBTestDouble();
+		$statuses = $database->connection_statuses_for_test();
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle exercises the real failure path without a server dependency.
 		$dbh = mysqli_init();
 
+		$this->assertSame( $statuses['dead'], $database->get_connection_status_for_test( $dbh ) );
 		$this->assertFalse( $database->is_connection_alive_for_test( $dbh ) );
 	}
 
@@ -294,6 +298,46 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * The boolean probe wrapper retains its bounded busy-connection behavior.
+	 */
+	public function test_connection_probe_wrapper_bounds_busy_connection_grace() {
+		$database                          = new LudicrousDBTestDouble();
+		$statuses                          = $database->connection_statuses_for_test();
+		$database->connection_probe_status = $statuses['busy'];
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is sufficient because the status probe is deterministic.
+		$dbh = mysqli_init();
+
+		$this->assertTrue( $database->is_connection_alive_for_test( $dbh ) );
+		$this->assertFalse( $database->is_connection_alive_for_test( $dbh ) );
+		$database->clear_busy_connection_probe_for_test( $dbh );
+		$this->assertTrue( $database->is_connection_alive_for_test( $dbh ) );
+	}
+
+	/**
+	 * Every connection status clears an earlier busy-probe marker.
+	 */
+	public function test_check_connection_clears_an_existing_busy_probe_marker() {
+		foreach ( array( 'available', 'busy', 'dead' ) as $status ) {
+			$database                          = new LudicrousDBTestDouble();
+			$statuses                          = $database->connection_statuses_for_test();
+			$database->connection_probe_status = $statuses[ $status ];
+			$database->reconnect_retries       = 0;
+			// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is sufficient because the status probe is deterministic.
+			$dbh = mysqli_init();
+
+			$database->dbh               = $dbh;
+			$database->dbhs['global__r'] = $dbh;
+			$this->assertTrue( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+			$this->assertFalse( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+
+			$database->check_connection( false, $dbh, 'SELECT 1' );
+
+			$this->assertTrue( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
+			$database->close_for_real_for_test( $dbh );
+		}
+	}
+
+	/**
 	 * Closing a handle clears its request-local busy-probe state.
 	 */
 	public function test_closing_connection_clears_busy_probe_grace() {
@@ -312,7 +356,8 @@ final class LudicrousDBTest extends TestCase {
 	 */
 	public function test_check_connection_replaces_busy_handle_without_closing_it() {
 		$database                          = new LudicrousDBTestDouble();
-		$database->connection_probe_result = true;
+		$statuses                          = $database->connection_statuses_for_test();
+		$database->connection_probe_status = $statuses['busy'];
 		$database->reconnect_retries       = 1;
 		$database->reconnect_sleep         = 0;
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init -- An inert handle is sufficient for deterministic cache-detachment behavior.
@@ -321,8 +366,6 @@ final class LudicrousDBTest extends TestCase {
 		$database->dbh                = $dbh;
 		$database->dbhs['global__r']  = $dbh;
 		$database->open_connections[] = 'global__r';
-		$this->assertTrue( $database->handle_connection_probe_failure_for_test( $dbh, 2014 ) );
-
 		$this->assertFalse( $database->check_connection( false, $dbh, 'SELECT 1' ) );
 		$this->assertSame( array( 'probe', 'reconnect' ), $database->connection_events );
 		$this->assertArrayNotHasKey( 'global__r', $database->dbhs );
