@@ -15,12 +15,12 @@ if ( ! $wpdb instanceof LudicrousDB ) {
 	throw new RuntimeException( 'LudicrousDB did not load.' );
 }
 
-if ( ! defined( 'DB_CHARSET' ) || '' === DB_CHARSET || ( defined( 'DB_COLLATE' ) && '' !== DB_COLLATE ) || defined( 'DB_CONFIG_FILE' ) ) {
+if ( ! defined( 'DB_CHARSET' ) || '' === DB_CHARSET || ( defined( 'DB_COLLATE' ) && '' !== DB_COLLATE ) ) {
 	throw new RuntimeException( 'This regression requires the default empty DB_COLLATE.' );
 }
 
-if ( empty( $wpdb->charset ) ) {
-	throw new RuntimeException( 'The database character set was not initialized.' );
+if ( DB_CHARSET !== $wpdb->charset || '' !== $wpdb->collate ) {
+	throw new RuntimeException( 'The default WordPress constants were not retained.' );
 }
 
 $connection = array(
@@ -37,10 +37,8 @@ if ( '1' !== (string) $fresh->get_var( 'SELECT 1' ) ) {
 	throw new RuntimeException( 'The database connection is not usable.' );
 }
 
-$expected = $fresh->determine_charset( DB_CHARSET, defined( 'DB_COLLATE' ) ? DB_COLLATE : '' );
-
-if ( $expected['charset'] !== $fresh->charset || $expected['collate'] !== $fresh->collate ) {
-	throw new RuntimeException( 'The live connection did not resolve the WordPress charset and collation.' );
+if ( DB_CHARSET !== $fresh->charset || '' !== $fresh->collate ) {
+	throw new RuntimeException( 'The empty collation or configured charset was changed.' );
 }
 
 if ( $fresh->charset !== $fresh->get_var( 'SELECT @@character_set_connection' ) ) {
@@ -53,14 +51,14 @@ if ( $connection_charset !== $fresh->get_var( 'SELECT @@character_set_connection
 	throw new RuntimeException( 'An empty charset changed the connection character set.' );
 }
 
-// Reinitializing without an active handle must not strand the resolved state.
+// Reinitializing must retain the configured defaults.
 $fresh->disconnect( 'global__r' );
 $fresh->dbh = null;
 $fresh->init_charset();
 $fresh->get_var( 'SELECT 1' );
 
-if ( $expected['charset'] !== $fresh->charset || $expected['collate'] !== $fresh->collate ) {
-	throw new RuntimeException( 'Reinitialization did not resolve the live connection.' );
+if ( DB_CHARSET !== $fresh->charset || '' !== $fresh->collate ) {
+	throw new RuntimeException( 'Reinitialization changed the configured charset or collation.' );
 }
 
 if ( is_multisite() && 1 > (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->blogs}" ) ) {
@@ -101,4 +99,59 @@ if ( 'latin1' !== $configured_after_construction->charset || '' !== $configured_
 
 if ( 'latin1' !== $configured_after_construction->get_var( 'SELECT @@character_set_connection' ) ) {
 	throw new RuntimeException( 'An empty collation prevented the configured character set.' );
+}
+
+// Set both host variables to exercise separate read and write servers.
+$primary_host = getenv( 'LDB_TEST_PRIMARY_HOST' );
+$replica_host = getenv( 'LDB_TEST_REPLICA_HOST' );
+
+if ( (bool) $primary_host !== (bool) $replica_host ) {
+	throw new RuntimeException( 'Set both database hosts to run the multi-server regression.' );
+}
+
+if ( $primary_host && $replica_host ) {
+	$routed = new LudicrousDB();
+	$routed->add_database( array_merge( $connection, array(
+		'host'  => $replica_host,
+		'read'  => 1,
+		'write' => 0,
+	) ) );
+	$routed->add_database( array_merge( $connection, array(
+		'host'  => $primary_host,
+		'read'  => 0,
+		'write' => 1,
+	) ) );
+
+	$routed->get_var( 'SELECT 1' );
+	$routed->query( 'SET @ldb_charset_probe = 1' );
+
+	if ( ! isset( $routed->dbhs['global__r'], $routed->dbhs['global__w'] ) ) {
+		throw new RuntimeException( 'Separate read and write connections were not opened.' );
+	}
+
+	$servers = array();
+	foreach ( array( 'global__r', 'global__w' ) as $name ) {
+		$dbh    = $routed->dbhs[ $name ];
+		$result = mysqli_query( $dbh, 'SELECT @@hostname, @@character_set_connection, @@collation_connection' );
+		$row    = mysqli_fetch_row( $result );
+		mysqli_free_result( $result );
+
+		if ( DB_CHARSET !== $row[1] ) {
+			throw new RuntimeException( 'A routed connection did not retain the configured charset.' );
+		}
+
+		$charset = mysqli_real_escape_string( $dbh, DB_CHARSET );
+		$result  = mysqli_query( $dbh, "SELECT DEFAULT_COLLATE_NAME FROM information_schema.CHARACTER_SETS WHERE CHARACTER_SET_NAME = '{$charset}'" );
+		$default = mysqli_fetch_row( $result );
+		mysqli_free_result( $result );
+
+		if ( ! $default || $default[0] !== $row[2] ) {
+			throw new RuntimeException( 'An empty DB_COLLATE did not use the server default.' );
+		}
+		$servers[] = $row[0];
+	}
+
+	if ( $servers[0] === $servers[1] ) {
+		throw new RuntimeException( 'Read and write queries reached the same server.' );
+	}
 }

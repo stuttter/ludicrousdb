@@ -6,7 +6,7 @@ Plugin URI:        https://github.com/stuttter/ludicrousdb/
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 License:           GPLv2 or later
 Tags:              database, mysql, performance, scaling, wpdb
-Requires PHP:      7.4
+Requires PHP:      7.0
 Requires at least: 5.0
 Tested up to:      6.5
 Stable tag:        5.3.1
@@ -83,8 +83,8 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 == Changelog ==
 
 = 5.3.1 =
-* Resolve WordPress charset support on a live connection while preserving constructor and db-config.php settings that differ from the WordPress constants.
-* Support an empty DB_COLLATE and follow WordPress defaults when DB_CHARSET is empty or undefined instead of choosing a LudicrousDB-specific charset.
+* Initialize LudicrousDB's configured charset before connecting, without changing its utf8mb4 defaults.
+* Allow an empty DB_COLLATE to use the server's default collation without stopping WordPress bootstrap.
 
 = 5.3.0 =
 * Fix unnecessary pings and add retry queries
