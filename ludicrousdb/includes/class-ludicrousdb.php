@@ -1051,31 +1051,7 @@ class LudicrousDB extends wpdb {
 			// Increment the connection counter
 			$this->increment_db_connection( $conn, 'queries' );
 
-			// A drop-in may override these settings after the link was opened.
-			$dbh = $this->dbhs[ $dbhname ];
-			if ( $dbh instanceof mysqli ) {
-				if ( ! $this->is_connection_charset_current( $dbh ) ) {
-					// A charset update cannot use a link with an active result.
-					if ( self::CONNECTION_AVAILABLE !== $this->get_connection_status( $dbh ) ) {
-						if ( ! $this->check_connection( false, $dbh, $query ) ) {
-							return false;
-						}
-
-						// Recovery may have replaced or rerouted the cached handle.
-						if ( ! isset( $this->dbhs[ $dbhname ] ) || $this->dbhs[ $dbhname ] !== $dbh ) {
-							return $this->dbh_type_check( $this->dbh ) ? $this->dbh : false;
-						}
-					}
-
-					$this->dbh = $dbh; // Needed by wpdb::prepare().
-					if ( false === $this->set_charset( $dbh ) ) {
-						$this->disconnect( $dbhname );
-						return false;
-					}
-				}
-			}
-
-			return $this->dbhs[ $dbhname ];
+			return $this->refresh_cached_connection_charset( $dbhname, $query );
 		}
 
 		// Bail if trying to connect to a dead primary
@@ -1737,7 +1713,7 @@ class LudicrousDB extends wpdb {
 				if ( ! $this->verify_default_connection_charset( $dbh ) ) {
 					return false;
 				}
-				$this->remember_connection_charset( $dbh );
+				$this->remember_connection_charset( $dbh, $charset, $collate );
 			}
 			return;
 		}
@@ -1777,7 +1753,7 @@ class LudicrousDB extends wpdb {
 		}
 		if ( $set_names && $dbh instanceof mysqli ) {
 			// An explicit per-link override survives until the object defaults change.
-			$this->remember_connection_charset( $dbh );
+			$this->remember_connection_charset( $dbh, $this->charset, $this->collate );
 		}
 	}
 
@@ -1797,15 +1773,57 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
+	 * Refresh a cached link when the object's charset settings change.
+	 *
+	 * A busy link may be replaced or rerouted by connection recovery, so return
+	 * the connection selected by that path rather than the original handle.
+	 *
+	 * @since 5.3.1
+	 *
+	 * @param string $dbhname Cached connection name.
+	 * @param string $query   Query being routed.
+	 * @return mysqli|resource|false Selected connection, or false on failure.
+	 */
+	private function refresh_cached_connection_charset( $dbhname, $query ) {
+		// A drop-in may override these settings after the link was opened.
+		$dbh = $this->dbhs[ $dbhname ];
+		if ( ! ( $dbh instanceof mysqli ) || $this->is_connection_charset_current( $dbh ) ) {
+			return $dbh;
+		}
+
+		// A charset update cannot use a link with an active result.
+		if ( self::CONNECTION_AVAILABLE !== $this->get_connection_status( $dbh ) ) {
+			if ( ! $this->check_connection( false, $dbh, $query ) ) {
+				return false;
+			}
+
+			// Recovery may have replaced or rerouted the cached handle.
+			if ( ! isset( $this->dbhs[ $dbhname ] ) || $this->dbhs[ $dbhname ] !== $dbh ) {
+				return $this->dbh_type_check( $this->dbh ) ? $this->dbh : false;
+			}
+		}
+
+		$this->dbh = $dbh; // Needed by wpdb::prepare().
+		if ( false === $this->set_charset( $dbh ) ) {
+			$this->disconnect( $dbhname );
+			return false;
+		}
+
+		return $this->dbhs[ $dbhname ];
+	}
+
+	/**
 	 * Remember the object charset settings applied to a MySQLi link.
 	 *
 	 * @since 5.3.1
 	 *
-	 * @param mysqli $dbh Database connection.
+	 * @param mysqli $dbh     Database connection.
+	 * @param string $charset Charset applied to the connection.
+	 * @param string $collate Collation applied to the connection.
 	 * @return void
 	 */
-	private function remember_connection_charset( $dbh ) {
-		$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $this->charset, $this->collate );
+	private function remember_connection_charset( $dbh, $charset, $collate ) {
+		$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $charset, $collate );
 	}
 
 	/**
