@@ -1,0 +1,96 @@
+name: Maintenance regression
+
+on:
+  push:
+    branches:
+      - maintenance/5.3
+  pull_request:
+    branches:
+      - maintenance/5.3
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  charset:
+    name: Charset / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.2']
+    env:
+      WP_PATH: ${{ runner.temp }}/ldb-wordpress
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP and WP-CLI
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli
+          coverage: none
+          tools: wp-cli
+
+      - name: Start isolated database servers
+        run: |
+          docker run -d --name ldb-primary -p 127.0.0.1:13306:3306 \
+            -e MARIADB_ROOT_PASSWORD=rootpass -e MARIADB_DATABASE=wordpress \
+            -e MARIADB_USER=ci -e MARIADB_PASSWORD=testpass \
+            mariadb:10.11 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+          docker run -d --name ldb-replica -p 127.0.0.1:13307:3306 \
+            -e MYSQL_ROOT_PASSWORD=rootpass -e MYSQL_DATABASE=wordpress \
+            -e MYSQL_USER=ci -e MYSQL_PASSWORD=testpass \
+            mysql:8.4 --character-set-server=utf8mb4
+          docker run -d --name ldb-unsafe -p 127.0.0.1:13308:3306 \
+            -e MARIADB_ROOT_PASSWORD=rootpass -e MARIADB_DATABASE=wordpress \
+            -e MARIADB_USER=ci -e MARIADB_PASSWORD=testpass \
+            mariadb:10.11 --character-set-server=gbk --collation-server=gbk_chinese_ci
+
+      - name: Wait for database initialization
+        run: |
+          for attempt in {1..60}; do
+            if docker exec ldb-primary mariadb -uci -ptestpass wordpress -e 'SELECT 1' >/dev/null 2>&1 \
+              && docker exec ldb-replica mysql -uci -ptestpass wordpress -e 'SELECT 1' >/dev/null 2>&1 \
+              && docker exec ldb-unsafe mariadb -uci -ptestpass wordpress -e 'SELECT 1' >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs ldb-primary
+          docker logs ldb-replica
+          docker logs ldb-unsafe
+          exit 1
+
+      - name: Install WordPress 6.4 multisite with the drop-in
+        run: |
+          wp core download --version=6.4 --path="$WP_PATH"
+          wp config create --path="$WP_PATH" --dbname=wordpress --dbuser=ci \
+            --dbpass=testpass --dbhost=127.0.0.1:13306 --dbcharset=utf8mb4 --dbcollate=
+          ln -s "$GITHUB_WORKSPACE" "$WP_PATH/wp-content/plugins/ludicrousdb"
+          cp ludicrousdb/drop-ins/db.php "$WP_PATH/wp-content/db.php"
+          cp tests/integration/db-config.php "$WP_PATH/db-config.php"
+          wp core multisite-install --path="$WP_PATH" --url=http://localhost \
+            --title='LudicrousDB CI' --admin_user=admin --admin_password=testpass \
+            --admin_email=ci@example.invalid --skip-email
+          wp eval --path="$WP_PATH" 'if ( ! is_multisite() ) { throw new RuntimeException( "Multisite did not boot." ); }'
+
+      - name: Check default and routed charset behavior
+        env:
+          LDB_TEST_PRIMARY_HOST: 127.0.0.1:13306
+          LDB_TEST_REPLICA_HOST: 127.0.0.1:13307
+        run: wp eval-file --path="$WP_PATH" tests/integration/charset-bootstrap.php
+
+      - name: Reject an unsafe server default
+        env:
+          LDB_TEST_UNSAFE_HOST: 127.0.0.1:13308
+        run: wp eval-file --path="$WP_PATH" tests/integration/charset-unsafe-default.php
+
+      - name: Check a charset with no collation constant
+        run: |
+          wp config set DB_CHARSET latin1 --path="$WP_PATH"
+          wp config delete DB_COLLATE --path="$WP_PATH"
+          wp eval-file --path="$WP_PATH" tests/integration/charset-missing-collate.php
