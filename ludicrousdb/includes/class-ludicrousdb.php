@@ -1602,8 +1602,17 @@ class LudicrousDB extends wpdb {
 			$collate = $this->collate;
 		}
 
-		// An empty collation uses the server default, as in wpdb.
+		// An empty charset leaves the connection at its server default.
 		if ( empty( $charset ) ) {
+			if ( $use_defaults && $dbh instanceof mysqli ) {
+				$current_charset = strtolower( mysqli_character_set_name( $dbh ) );
+				if ( 'utf8mb3' === $current_charset ) {
+					$current_charset = 'utf8';
+				}
+				if ( ! in_array( $current_charset, self::$allowed_charsets, true ) ) {
+					wp_die( "{$current_charset} charset isn't supported in LudicrousDB for security reasons" );
+				}
+			}
 			return;
 		}
 

@@ -15,7 +15,7 @@ if ( ! $wpdb instanceof LudicrousDB ) {
 	throw new RuntimeException( 'LudicrousDB did not load.' );
 }
 
-if ( ! defined( 'DB_CHARSET' ) || '' === DB_CHARSET || ( defined( 'DB_COLLATE' ) && '' !== DB_COLLATE ) ) {
+if ( ! defined( 'DB_CHARSET' ) || '' === DB_CHARSET || ! defined( 'DB_COLLATE' ) || '' !== DB_COLLATE ) {
 	throw new RuntimeException( 'This regression requires the default empty DB_COLLATE.' );
 }
 
@@ -162,6 +162,10 @@ if ( (bool) $primary_host !== (bool) $replica_host ) {
 	throw new RuntimeException( 'Set both database hosts to run the multi-server regression.' );
 }
 
+if ( $primary_host && $primary_host === $replica_host ) {
+	throw new RuntimeException( 'Use distinct database hosts for the multi-server regression.' );
+}
+
 if ( $primary_host && $replica_host ) {
 	$routed = new LudicrousDB();
 	$routed->add_database( array_merge( $connection, array(
@@ -207,14 +211,17 @@ if ( $primary_host && $replica_host ) {
 	$routed->get_var( 'SELECT 1' );
 	$routed->query( 'SET @ldb_charset_probe = 3' );
 
-	$servers = array();
+	if ( $routed->dbhs['global__r'] === $routed->dbhs['global__w'] ) {
+		throw new RuntimeException( 'Read and write queries reused one database connection.' );
+	}
+
 	foreach ( array( 'global__r', 'global__w' ) as $name ) {
 		$dbh    = $routed->dbhs[ $name ];
-		$result = mysqli_query( $dbh, 'SELECT @@hostname, @@character_set_connection, @@collation_connection' );
+		$result = mysqli_query( $dbh, 'SELECT @@character_set_connection, @@collation_connection' );
 		$row    = mysqli_fetch_row( $result );
 		mysqli_free_result( $result );
 
-		if ( DB_CHARSET !== $row[1] ) {
+		if ( DB_CHARSET !== $row[0] ) {
 			throw new RuntimeException( 'A routed connection did not retain the configured charset.' );
 		}
 
@@ -223,13 +230,8 @@ if ( $primary_host && $replica_host ) {
 		$default = mysqli_fetch_row( $result );
 		mysqli_free_result( $result );
 
-		if ( ! $default || $default[0] !== $row[2] ) {
+		if ( ! $default || $default[0] !== $row[1] ) {
 			throw new RuntimeException( 'An empty DB_COLLATE did not use the server default.' );
 		}
-		$servers[] = $row[0];
-	}
-
-	if ( $servers[0] === $servers[1] ) {
-		throw new RuntimeException( 'Read and write queries reached the same server.' );
 	}
 }
