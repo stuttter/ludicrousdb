@@ -154,7 +154,9 @@ final class LiveCharsetTest extends TestCase {
 		$get_select_count = static function () use ( $dbh ) {
 			// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Read the server's per-session SELECT counter without incrementing it.
 			$result = mysqli_query( $dbh, "SHOW SESSION STATUS LIKE 'Com_select'" );
-			$row    = mysqli_fetch_row( $result );
+			// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_fetch_row -- Read the status result without involving the database wrapper.
+			$row = mysqli_fetch_row( $result );
+			// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_free_result -- Release the status result on the measured connection.
 			mysqli_free_result( $result );
 			return (int) $row[1];
 		};
