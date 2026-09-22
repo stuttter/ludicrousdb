@@ -37,6 +37,10 @@ A dataset is defined as a group of tables that are located in the same database.
 
 Configuring LudicrousDB involves defining databases and datasets. Defining a database involves specifying the server connection details, the dataset it contains, and its capabilities and priorities for reading and writing. Defining a dataset involves specifying its exact table names or registering one or more callback functions that translate table names to datasets.
 
+For the effective charset and collation settings, including when an empty
+charset causes a one-time connection check and how to avoid that read-back,
+see the [character sets and collations wiki page](https://github.com/stuttter/ludicrousdb/wiki/Character-Sets-and-Collations).
+
 ### Sample Configuration 1: Default Server
 
 This is the most basic way to add a server to LudicrousDB using only the required parameters: host, user, password, name. This adds the DB defined in wp-config.php as a read/write server for the 'global' dataset. (Every table is in 'global' by default.)

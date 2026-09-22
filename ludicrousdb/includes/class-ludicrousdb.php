@@ -233,6 +233,10 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Object charset and collation when each MySQLi connection was last configured.
 	 *
+	 * Cached links can outlive changes to these public properties. Recording the
+	 * settings per link lets db_connect() refresh a changed link without sending
+	 * another charset command or verification query on every reuse.
+	 *
 	 * @var array<string, array{string, string}>
 	 */
 	protected $connection_charsets = array();
@@ -1686,7 +1690,14 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Sets the connection's character set
+	 * Set the connection's character set.
+	 *
+	 * A non-empty charset is applied through MySQLi and SET NAMES. An empty
+	 * effective default leaves the server session alone, so verify its client
+	 * and connection charsets before trusting it. Explicit per-call overrides
+	 * do not change the tracked object defaults. Returns false if the charset
+	 * cannot be applied or the session cannot be inspected; otherwise it has
+	 * no return value.
 	 *
 	 * @since 1.0.0
 	 *
@@ -1760,6 +1771,10 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Check whether a MySQLi link has the current object charset settings.
 	 *
+	 * This compares only the settings recorded for the link; it deliberately
+	 * does not inspect the server on the ordinary cached-query path. An
+	 * out-of-band session change is not detected by this comparison.
+	 *
 	 * @since 5.3.1
 	 *
 	 * @param mysqli $dbh Database connection.
@@ -1774,6 +1789,11 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Refresh a cached link when the object's charset settings change.
+	 *
+	 * An unchanged link returns without another database command. A changed
+	 * link is checked for an active result before set_charset() applies or
+	 * verifies the new setting; this avoids interfering with an unbuffered
+	 * result on the old link.
 	 *
 	 * A busy link may be replaced or rerouted by connection recovery, so return
 	 * the connection selected by that path rather than the original handle.
@@ -1815,6 +1835,9 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Remember the object charset settings applied to a MySQLi link.
 	 *
+	 * This is an in-memory record, not proof that later SQL or connection
+	 * callbacks have left the server session unchanged.
+	 *
 	 * @since 5.3.1
 	 *
 	 * @param mysqli $dbh     Database connection.
@@ -1829,6 +1852,9 @@ class LudicrousDB extends wpdb {
 	/**
 	 * Forget charset settings when a MySQLi link is replaced or closed.
 	 *
+	 * The next link must be configured independently, even if PHP eventually
+	 * reuses an object hash from a closed connection.
+	 *
 	 * @since 5.3.1
 	 *
 	 * @param mysqli|resource $dbh Database connection.
@@ -1842,6 +1868,12 @@ class LudicrousDB extends wpdb {
 
 	/**
 	 * Verify that an unconfigured MySQLi link uses an allowed client and session charset.
+	 *
+	 * An empty effective charset means LudicrousDB does not send SET NAMES.
+	 * mysqli_character_set_name() alone cannot reveal a server-side SET NAMES
+	 * change, so inspect both session charset variables as well. This adds one
+	 * SELECT when an empty default is first used on a link or becomes the new
+	 * object setting, not one SELECT per cached query.
 	 *
 	 * @since 5.3.1
 	 *
