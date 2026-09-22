@@ -231,7 +231,7 @@ class LudicrousDB extends wpdb {
 	public $db_connections = array();
 
 	/**
-	 * Charset and collation last applied to each MySQLi connection.
+	 * Object charset and collation when each MySQLi connection was last configured.
 	 *
 	 * @var array<string, array{string, string}>
 	 */
@@ -1780,8 +1780,9 @@ class LudicrousDB extends wpdb {
 
 		// Do the query
 		$set_names = $this->_do_query( $query, $dbh );
-		if ( $use_defaults && $set_names && $dbh instanceof mysqli ) {
-			$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $charset, $collate );
+		if ( $set_names && $dbh instanceof mysqli ) {
+			// An explicit per-link override survives until the object defaults change.
+			$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $this->charset, $this->collate );
 		}
 	}
 

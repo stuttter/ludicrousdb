@@ -60,6 +60,17 @@ final class LiveCharsetTest extends TestCase {
 				}
 				return $query;
 			}
+
+			/**
+			 * Keep a healthy cached connection from entering the recovery path.
+			 *
+			 * @param string $dbhname Connection name.
+			 * @return bool
+			 */
+			public function should_mysql_ping( $dbhname = '' ) {
+				unset( $dbhname );
+				return false;
+			}
 		};
 
 		$database->set_charset( $dbh );
@@ -71,6 +82,33 @@ final class LiveCharsetTest extends TestCase {
 		$database->set_charset( $dbh );
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_character_set_name -- Empty settings must preserve the safe client charset.
 		$this->assertSame( 'utf8mb4', mysqli_character_set_name( $dbh ) );
+
+		// An explicit per-connection override must survive reuse until the
+		// object's own charset settings change.
+		$database->set_charset( $dbh, 'latin1', 'latin1_swedish_ci' );
+		$database->add_database(
+			array(
+				'host'     => $host,
+				'user'     => getenv( 'LDB_TEST_DB_USER' ),
+				'password' => getenv( 'LDB_TEST_DB_PASSWORD' ),
+				'name'     => getenv( 'LDB_TEST_DB_NAME' ),
+			)
+		);
+		$database->dbhs['global__r']            = $dbh;
+		$database->used_servers['global__r']    = array( 'name' => getenv( 'LDB_TEST_DB_NAME' ) );
+		$database->dbh2host['global__r']        = $host;
+		$database->db_connections[0]['dbhname'] = 'global__r';
+		$this->assertSame( $dbh, $database->db_connect( false, 'SELECT 1' ) );
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_character_set_name -- Cached routing must preserve explicit per-link settings.
+		$this->assertSame( 'latin1', mysqli_character_set_name( $dbh ) );
+
+		$database->charset = 'utf8mb4';
+		$database->collate = 'utf8mb4_unicode_520_ci';
+		$database->db_connect( false, 'SELECT 1' );
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_character_set_name -- Changed object defaults must refresh the cached link.
+		$this->assertSame( 'utf8mb4', mysqli_character_set_name( $dbh ) );
+		$database->charset = '';
+		$database->collate = '';
 
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Reproduce an unsafe server-side change invisible to mysqli_character_set_name().
 		$this->assertTrue( mysqli_query( $dbh, 'SET NAMES gbk' ) );
