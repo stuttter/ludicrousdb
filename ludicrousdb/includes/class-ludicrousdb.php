@@ -543,6 +543,11 @@ class LudicrousDB extends wpdb {
 		// Use constant if defined
 		if ( defined( 'DB_CHARSET' ) ) {
 			$charset = DB_CHARSET;
+
+			// Do not pair a custom charset with the utf8mb4 fallback collation.
+			if ( ! defined( 'DB_COLLATE' ) && 'utf8mb4' !== strtolower( $charset ) ) {
+				$collate = '';
+			}
 		}
 
 		// Determine charset and collate
@@ -1283,6 +1288,10 @@ class LudicrousDB extends wpdb {
 			break;
 		} while ( true );
 
+		// A new link must not inherit a previous object's cached settings.
+		if ( $this->dbhs[ $dbhname ] instanceof mysqli ) {
+			unset( $this->connection_charsets[ spl_object_hash( $this->dbhs[ $dbhname ] ) ] );
+		}
 		$this->set_charset( $this->dbhs[ $dbhname ] );
 
 		$this->dbh                      = $this->dbhs[ $dbhname ]; // needed by $wpdb->_real_escape()
@@ -1581,6 +1590,7 @@ class LudicrousDB extends wpdb {
 	 * @param string          $collate Optional. The collation.
 	 */
 	public function set_charset( $dbh, $charset = null, $collate = null ) {
+		$use_defaults = ( null === $charset && null === $collate );
 
 		// Default charset
 		if ( ! isset( $charset ) ) {
@@ -1626,7 +1636,8 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Do the query
-		if ( $this->_do_query( $query, $dbh ) && $dbh instanceof mysqli ) {
+		$set_names = $this->_do_query( $query, $dbh );
+		if ( $use_defaults && $set_names && $dbh instanceof mysqli ) {
 			$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $charset, $collate );
 		}
 	}
@@ -2080,12 +2091,12 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
+		if ( $dbh instanceof mysqli ) {
+			unset( $this->connection_charsets[ spl_object_hash( $dbh ) ] );
+		}
 		$closed = mysqli_close( $dbh );
 
 		if ( ! empty( $closed ) ) {
-			if ( $dbh instanceof mysqli ) {
-				unset( $this->connection_charsets[ spl_object_hash( $dbh ) ] );
-			}
 			$this->dbh = null;
 		}
 

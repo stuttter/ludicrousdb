@@ -83,7 +83,8 @@ if ( 'latin1' !== $configured->get_var( 'SELECT @@character_set_connection' ) ) 
 	throw new RuntimeException( 'The configured connection did not retain its character set.' );
 }
 
-$configured_after_construction = new LudicrousDB();
+require_once __DIR__ . '/class-ldb-charset-probe.php';
+$configured_after_construction = new LDB_Charset_Probe();
 
 $configured_after_construction->charset = 'latin1';
 $configured_after_construction->collate = '';
@@ -113,6 +114,12 @@ if ( 'utf8mb4_unicode_ci' !== $configured_after_construction->get_var( 'SELECT @
 	throw new RuntimeException( 'A later collation override did not reach the existing connection.' );
 }
 
+$set_charset_calls = $configured_after_construction->set_charset_calls;
+$configured_after_construction->get_var( 'SELECT 1' );
+if ( $set_charset_calls !== $configured_after_construction->set_charset_calls ) {
+	throw new RuntimeException( 'An unchanged connection repeated SET NAMES.' );
+}
+
 // A table can have its own collation without changing the connection setting.
 $dbh = $configured_after_construction->dbh;
 if ( ! mysqli_query( $dbh, 'CREATE TEMPORARY TABLE ldb_charset_probe (value varchar(10)) CHARACTER SET latin1 COLLATE latin1_swedish_ci' ) ) {
@@ -140,6 +147,12 @@ if ( ! $session || array( 'utf8mb4', 'utf8mb4_unicode_ci' ) !== $session ) {
 }
 
 mysqli_query( $dbh, 'DROP TEMPORARY TABLE ldb_charset_probe' );
+
+// Explicit set_charset() calls must not be undone by the cached-link check.
+$configured_after_construction->set_charset( $dbh, 'latin1', 'latin1_swedish_ci' );
+if ( 'latin1' !== $configured_after_construction->get_var( 'SELECT @@character_set_connection' ) ) {
+	throw new RuntimeException( 'A cached query undid an explicit set_charset() call.' );
+}
 
 // Set both host variables to exercise separate read and write servers.
 $primary_host = getenv( 'LDB_TEST_PRIMARY_HOST' );

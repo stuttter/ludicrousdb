@@ -85,6 +85,8 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 = 5.3.1 =
 * Initialize LudicrousDB's configured charset before connecting, without changing its utf8mb4 defaults.
 * Allow an empty DB_COLLATE to use the server's default collation without stopping WordPress bootstrap.
+* Avoid pairing an explicit non-utf8mb4 DB_CHARSET with the utf8mb4 fallback collation when DB_COLLATE is absent.
+* Apply later charset and collation property changes to reused connections without overriding explicit set_charset() calls.
 
 = 5.3.0 =
 * Fix unnecessary pings and add retry queries
