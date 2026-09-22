@@ -146,9 +146,26 @@ final class LiveCharsetTest extends TestCase {
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_character_set_name -- Changed object defaults must refresh the cached link.
 		$this->assertSame( 'utf8mb4', mysqli_character_set_name( $dbh ) );
 
-		// A pending result must survive while routing moves to a fresh handle.
+		// Empty settings need one session check when they change, not another
+		// SELECT every time a normal query reuses the cached connection.
 		$database->charset = '';
 		$database->collate = '';
+		$this->assertSame( $dbh, $database->db_connect( false, 'SELECT 1' ) );
+		$get_select_count = static function () use ( $dbh ) {
+			// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Read the server's per-session SELECT counter without incrementing it.
+			$result = mysqli_query( $dbh, "SHOW SESSION STATUS LIKE 'Com_select'" );
+			$row    = mysqli_fetch_row( $result );
+			mysqli_free_result( $result );
+			return (int) $row[1];
+		};
+
+		$selects_before = $get_select_count();
+		for ( $i = 0; $i < 3; ++$i ) {
+			$this->assertSame( $dbh, $database->db_connect( false, 'SELECT 1' ) );
+		}
+		$this->assertSame( $selects_before, $get_select_count(), 'Cached reuse must not issue another charset validation SELECT.' );
+
+		// A pending result must survive while routing moves to a fresh handle.
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Manufacture a busy link for the charset refresh path.
 		$busy_result = mysqli_query( $dbh, 'SELECT 1 UNION ALL SELECT 2', MYSQLI_USE_RESULT );
 		$this->assertInstanceOf( mysqli_result::class, $busy_result );
