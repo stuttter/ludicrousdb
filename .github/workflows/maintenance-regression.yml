@@ -22,7 +22,7 @@ jobs:
       matrix:
         php: ['7.4', '8.2']
     env:
-      WP_PATH: ${{ runner.temp }}/ldb-wordpress
+      WP_PATH: /tmp/ldb-wordpress
 
     steps:
       - uses: actions/checkout@v4
