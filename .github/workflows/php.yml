@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ master, maintenance/5.3 ]
 
+permissions:
+  contents: read
+
 jobs:
   phpcs:
 
