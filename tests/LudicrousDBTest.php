@@ -32,6 +32,16 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * A constructor charset override must not retain another charset's collation.
+	 */
+	public function test_constructor_charset_without_collation_uses_server_default() {
+		$database = new LudicrousDB( array( 'charset' => 'latin1' ) );
+
+		$this->assertSame( 'latin1', $database->charset );
+		$this->assertSame( '', $database->collate );
+	}
+
+	/**
 	 * A custom charset without DB_COLLATE must not inherit the utf8mb4 collation.
 	 *
 	 * @runInSeparateProcess

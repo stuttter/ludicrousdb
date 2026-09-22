@@ -532,6 +532,22 @@ class LudicrousDB extends wpdb {
 
 		// Only set vars if there are vars to set
 		if ( ! empty( $class_vars ) ) {
+			// A constructor charset override must not retain the previous
+			// charset's collation when no replacement was supplied.
+			if (
+				isset( $class_vars['charset'] )
+				&&
+				! isset( $class_vars['collate'] )
+				&&
+				(
+					! is_string( $class_vars['charset'] )
+					||
+					0 !== strcasecmp( $class_vars['charset'], $this->charset )
+				)
+			) {
+				$class_vars['collate'] = '';
+			}
+
 			$this->set_class_vars( $class_vars );
 		}
 	}
