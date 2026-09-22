@@ -120,6 +120,13 @@ final class LiveCharsetTest extends TestCase {
 		$database->set_charset( $dbh );
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_character_set_name -- Empty settings must preserve the safe client charset.
 		$this->assertSame( 'utf8mb4', mysqli_character_set_name( $dbh ) );
+		// Both charsets are supported even when the server intentionally uses a
+		// different connection charset from the client library.
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Exercise a valid mixed session for empty-default verification.
+		$this->assertTrue( mysqli_query( $dbh, 'SET character_set_connection = latin1' ) );
+		$this->assertNull( $database->set_charset( $dbh ) );
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Restore the session for subsequent charset regressions.
+		$this->assertTrue( mysqli_query( $dbh, 'SET character_set_connection = utf8mb4' ) );
 
 		// An explicit per-connection override must survive reuse until the
 		// object's own charset settings change.

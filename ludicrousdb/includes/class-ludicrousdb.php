@@ -1889,7 +1889,8 @@ class LudicrousDB extends wpdb {
 	 *
 	 * An empty effective charset means LudicrousDB does not send SET NAMES.
 	 * mysqli_character_set_name() alone cannot reveal a server-side SET NAMES
-	 * change, so inspect both session charset variables as well. This adds one
+	 * change, so inspect both session charset variables as well. Each observed
+	 * charset must be supported, but the values need not match. This adds one
 	 * SELECT when an empty default is first used on a link or becomes the new
 	 * object setting, not one SELECT per cached query.
 	 *
