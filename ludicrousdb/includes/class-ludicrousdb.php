@@ -178,6 +178,13 @@ class LudicrousDB extends wpdb {
 	public $db_connections = array();
 
 	/**
+	 * Charset and collation last applied to each MySQLi connection.
+	 *
+	 * @var array
+	 */
+	protected $connection_charsets = array();
+
+	/**
 	 * The list of unclosed connections sorted by LRU.
 	 *
 	 * @var array Default empty array.
@@ -382,6 +389,9 @@ class LudicrousDB extends wpdb {
 		// Start the TCP cache
 		$this->tcp_cache_start();
 
+		// Initialize the charset before applying explicit overrides.
+		$this->init_charset();
+
 		// Prepare class vars
 		$this->prepare_class_vars( $dbuser, $dbpassword, $dbname, $dbhost );
 	}
@@ -522,11 +532,10 @@ class LudicrousDB extends wpdb {
 	 */
 	public function init_charset() {
 
-		// Defaults
+		// Preserve LudicrousDB defaults when WordPress constants are absent.
 		$charset = 'utf8mb4';
 		$collate = 'utf8mb4_unicode_520_ci';
 
-		// Use constant if defined
 		if ( defined( 'DB_COLLATE' ) ) {
 			$collate = DB_COLLATE;
 		}
@@ -534,6 +543,11 @@ class LudicrousDB extends wpdb {
 		// Use constant if defined
 		if ( defined( 'DB_CHARSET' ) ) {
 			$charset = DB_CHARSET;
+
+			// Do not pair a custom charset with the utf8mb4 fallback collation.
+			if ( ! defined( 'DB_COLLATE' ) && 'utf8mb4' !== strtolower( $charset ) ) {
+				$collate = '';
+			}
 		}
 
 		// Determine charset and collate
@@ -958,6 +972,19 @@ class LudicrousDB extends wpdb {
 			// Increment the connection counter
 			$this->increment_db_connection( $conn, 'queries' );
 
+			// A drop-in may override these settings after the link was opened.
+			$dbh = $this->dbhs[ $dbhname ];
+			if (
+				$dbh instanceof mysqli
+				&&
+				! empty( $this->charset )
+				&&
+				( ! isset( $this->connection_charsets[ spl_object_hash( $dbh ) ] )
+					|| array( $this->charset, $this->collate ) !== $this->connection_charsets[ spl_object_hash( $dbh ) ] )
+			) {
+				$this->set_charset( $dbh );
+			}
+
 			return $this->dbhs[ $dbhname ];
 		}
 
@@ -1261,6 +1288,10 @@ class LudicrousDB extends wpdb {
 			break;
 		} while ( true );
 
+		// A new link must not inherit a previous object's cached settings.
+		if ( $this->dbhs[ $dbhname ] instanceof mysqli ) {
+			unset( $this->connection_charsets[ spl_object_hash( $this->dbhs[ $dbhname ] ) ] );
+		}
 		$this->set_charset( $this->dbhs[ $dbhname ] );
 
 		$this->dbh                      = $this->dbhs[ $dbhname ]; // needed by $wpdb->_real_escape()
@@ -1559,6 +1590,7 @@ class LudicrousDB extends wpdb {
 	 * @param string          $collate Optional. The collation.
 	 */
 	public function set_charset( $dbh, $charset = null, $collate = null ) {
+		$use_defaults = ( null === $charset && null === $collate );
 
 		// Default charset
 		if ( ! isset( $charset ) ) {
@@ -1570,9 +1602,18 @@ class LudicrousDB extends wpdb {
 			$collate = $this->collate;
 		}
 
-		// Exit if charset or collation are empty
-		if ( empty( $charset ) || empty( $collate ) ) {
-			wp_die( "{$charset}  {$collate}" );
+		// An empty charset leaves the connection at its server default.
+		if ( empty( $charset ) ) {
+			if ( $use_defaults && $dbh instanceof mysqli ) {
+				$current_charset = strtolower( mysqli_character_set_name( $dbh ) );
+				if ( 'utf8mb3' === $current_charset ) {
+					$current_charset = 'utf8';
+				}
+				if ( ! in_array( $current_charset, self::$allowed_charsets, true ) ) {
+					wp_die( "{$current_charset} charset isn't supported in LudicrousDB for security reasons" );
+				}
+			}
+			return;
 		}
 
 		// Exit if charset is not allowed
@@ -1604,7 +1645,10 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Do the query
-		$this->_do_query( $query, $dbh );
+		$set_names = $this->_do_query( $query, $dbh );
+		if ( $use_defaults && $set_names && $dbh instanceof mysqli ) {
+			$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $charset, $collate );
+		}
 	}
 
 	/**
@@ -2056,6 +2100,9 @@ class LudicrousDB extends wpdb {
 			return false;
 		}
 
+		if ( $dbh instanceof mysqli ) {
+			unset( $this->connection_charsets[ spl_object_hash( $dbh ) ] );
+		}
 		$closed = mysqli_close( $dbh );
 
 		if ( ! empty( $closed ) ) {

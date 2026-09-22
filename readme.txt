@@ -9,7 +9,7 @@ Tags:              database, mysql, performance, scaling, wpdb
 Requires PHP:      7.0
 Requires at least: 5.0
 Tested up to:      6.5
-Stable tag:        5.3.0
+Stable tag:        5.3.1
 
 LudicrousDB is an advanced database interface for WordPress that supports replication, fail-over, load balancing, and partitioning
 
@@ -81,6 +81,12 @@ One way LudicrousDB differs from WPDB is that LudicrousDB does not attempt to co
 Since LudicrousDB attempts a connection only when a query is made, your WordPress installation will not kill the site with a database error, but will let the code decide what to do next on an unsuccessful query. If you want to do something different, like setting a custom error page or kill the site, you need to define the 'db_connection_error' callback in your db-config.php.
 
 == Changelog ==
+
+= 5.3.1 =
+* Initialize LudicrousDB's configured charset before connecting, without changing its utf8mb4 defaults.
+* Allow an empty DB_COLLATE to use the server's default collation without stopping WordPress bootstrap.
+* Avoid pairing an explicit non-utf8mb4 DB_CHARSET with the utf8mb4 fallback collation when DB_COLLATE is absent.
+* Apply later charset and collation property changes to reused connections without overriding explicit set_charset() calls.
 
 = 5.3.0 =
 * Fix unnecessary pings and add retry queries
