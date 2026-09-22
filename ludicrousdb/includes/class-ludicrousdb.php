@@ -231,7 +231,7 @@ class LudicrousDB extends wpdb {
 	public $db_connections = array();
 
 	/**
-	 * Object charset and collation when each MySQLi connection was last configured.
+	 * Object charset and collation last associated with each MySQLi connection.
 	 *
 	 * Cached links can outlive changes to these public properties. Recording the
 	 * settings per link lets db_connect() refresh a changed link without sending
@@ -1849,10 +1849,12 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Remember the object charset settings applied to a MySQLi link.
+	 * Remember the object charset settings associated with a MySQLi link.
 	 *
-	 * This is an in-memory record, not proof that later SQL or connection
-	 * callbacks have left the server session unchanged.
+	 * Explicit per-link overrides record the object's unchanged defaults so the
+	 * override survives reuse until those defaults change. The record is not
+	 * proof of the server's current session charset, especially after later SQL
+	 * or connection callbacks.
 	 *
 	 * @since 5.3.1
 	 *
