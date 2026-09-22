@@ -11,7 +11,7 @@
  * Text Domain:       ludicrousdb
  * Requires PHP:      7.4
  * Requires at least: 6.4
- * Version:           5.3.0
+ * Version:           5.3.1
  */
 
 // Exit if accessed directly

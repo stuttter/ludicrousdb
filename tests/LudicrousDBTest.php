@@ -17,6 +17,116 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Explicit constructor settings take precedence over fallback defaults.
+	 */
+	public function test_constructor_preserves_explicit_character_set() {
+		$database = new LudicrousDB(
+			array(
+				'charset' => 'latin1',
+				'collate' => 'latin1_swedish_ci',
+			)
+		);
+
+		$this->assertSame( 'latin1', $database->charset );
+		$this->assertSame( 'latin1_swedish_ci', $database->collate );
+	}
+
+	/**
+	 * A custom charset without DB_COLLATE must not inherit the utf8mb4 collation.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_custom_charset_without_collation_constant() {
+		define( 'DB_CHARSET', 'latin1' );
+
+		$database = new LudicrousDB();
+
+		$this->assertSame( 'latin1', $database->charset );
+		$this->assertSame( '', $database->collate );
+	}
+
+	/**
+	 * Cached links receive later charset changes without repeated SET NAMES.
+	 */
+	public function test_cached_connection_refreshes_changed_charset_only() {
+		$database = new class() extends LudicrousDB {
+			/**
+			 * Number of charset updates requested.
+			 *
+			 * @var int
+			 */
+			public $set_charset_calls = 0;
+
+			/**
+			 * Count requested charset updates without using the inert test handle.
+			 *
+			 * @param mysqli $dbh     Connection handle.
+			 * @param string $charset Optional charset.
+			 * @param string $collate Optional collation.
+			 */
+			public function set_charset( $dbh, $charset = null, $collate = null ) {
+				unset( $dbh, $charset, $collate );
+				++$this->set_charset_calls;
+			}
+
+			/**
+			 * Keep the test independent of a live server.
+			 *
+			 * @param string $dbhname Connection name.
+			 * @return bool
+			 */
+			public function should_mysql_ping( $dbhname = '' ) {
+				unset( $dbhname );
+				return false;
+			}
+
+			/**
+			 * Record the settings as though they were applied to the connection.
+			 *
+			 * @param mysqli $dbh Connection handle.
+			 */
+			public function mark_charset_applied( $dbh ) {
+				$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $this->charset, $this->collate );
+			}
+		};
+
+		$database->add_database(
+			array(
+				'host'     => DB_HOST,
+				'user'     => DB_USER,
+				'password' => DB_PASSWORD,
+				'name'     => DB_NAME,
+			)
+		);
+
+		// An inert handle is enough to exercise cached routing without a server.
+		$dbh                                    = mysqli_init(); // phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init
+		$database->dbhs['global__r']            = $dbh;
+		$database->used_servers['global__r']    = array( 'name' => DB_NAME );
+		$database->dbh2host['global__r']        = DB_HOST;
+		$database->db_connections[0]['dbhname'] = 'global__r';
+
+		$this->assertSame( $dbh, $database->db_connect( false, 'SELECT 1' ) );
+		$this->assertSame( 1, $database->set_charset_calls );
+
+		$database->mark_charset_applied( $dbh );
+		$database->db_connect( false, 'SELECT 1' );
+		$this->assertSame( 1, $database->set_charset_calls );
+
+		$database->charset = 'latin1';
+		$database->collate = 'latin1_swedish_ci';
+		$database->db_connect( false, 'SELECT 1' );
+		$this->assertSame( 2, $database->set_charset_calls );
+
+		$database->mark_charset_applied( $dbh );
+		$database->charset = '';
+		$database->collate = '';
+		$database->db_connect( false, 'SELECT 1' );
+		$this->assertSame( 3, $database->set_charset_calls );
+	}
+
+	/**
 	 * The wpdb-style constructor assigns all four connection properties.
 	 */
 	public function test_constructor_accepts_wpdb_connection_arguments() {

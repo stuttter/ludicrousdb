@@ -231,6 +231,13 @@ class LudicrousDB extends wpdb {
 	public $db_connections = array();
 
 	/**
+	 * Charset and collation last applied to each MySQLi connection.
+	 *
+	 * @var array<string, array{string, string}>
+	 */
+	protected $connection_charsets = array();
+
+	/**
 	 * The list of unclosed connections sorted by LRU.
 	 *
 	 * @var array Default empty array.
@@ -435,11 +442,11 @@ class LudicrousDB extends wpdb {
 		// Start the TCP cache
 		$this->tcp_cache_start();
 
+		// Initialize defaults before applying explicit constructor settings.
+		$this->init_charset();
+
 		// Prepare class vars
 		$this->prepare_class_vars( $dbuser, $dbpassword, $dbname, $dbhost );
-
-		// Initialize charset and collate
-		$this->init_charset();
 	}
 
 	/**
@@ -598,6 +605,11 @@ class LudicrousDB extends wpdb {
 		// Use constant if defined
 		if ( defined( 'DB_CHARSET' ) ) {
 			$charset = DB_CHARSET;
+
+			// Do not pair a custom charset with the utf8mb4 fallback collation.
+			if ( ! defined( 'DB_COLLATE' ) && 'utf8mb4' !== strtolower( $charset ) ) {
+				$collate = '';
+			}
 		}
 
 		// Determine charset and collate
@@ -1039,6 +1051,17 @@ class LudicrousDB extends wpdb {
 			// Increment the connection counter
 			$this->increment_db_connection( $conn, 'queries' );
 
+			// A drop-in may override these settings after the link was opened.
+			$dbh = $this->dbhs[ $dbhname ];
+			if (
+				$dbh instanceof mysqli
+				&&
+				( ! isset( $this->connection_charsets[ spl_object_hash( $dbh ) ] )
+					|| array( $this->charset, $this->collate ) !== $this->connection_charsets[ spl_object_hash( $dbh ) ] )
+			) {
+				$this->set_charset( $dbh );
+			}
+
 			return $this->dbhs[ $dbhname ];
 		}
 
@@ -1343,6 +1366,10 @@ class LudicrousDB extends wpdb {
 			break;
 		} while ( true );
 
+		// A new link must not inherit a previous object's cached settings.
+		if ( $this->dbhs[ $dbhname ] instanceof mysqli ) {
+			unset( $this->connection_charsets[ spl_object_hash( $this->dbhs[ $dbhname ] ) ] );
+		}
 		$this->set_charset( $this->dbhs[ $dbhname ] );
 
 		$this->dbh                      = $this->dbhs[ $dbhname ]; // needed by $wpdb->_real_escape()
@@ -1676,6 +1703,7 @@ class LudicrousDB extends wpdb {
 	 * @param string          $collate Optional. The collation.
 	 */
 	public function set_charset( $dbh, $charset = null, $collate = null ) {
+		$use_defaults = ( null === $charset && null === $collate );
 
 		// Default charset
 		if ( ! isset( $charset ) ) {
@@ -1687,8 +1715,38 @@ class LudicrousDB extends wpdb {
 			$collate = $this->collate;
 		}
 
-		// Exit if charset is empty
+		// An empty charset leaves the connection at its server default.
 		if ( empty( $charset ) ) {
+			if ( $use_defaults && $dbh instanceof mysqli ) {
+				// SET NAMES can change the server session without changing MySQLi's
+				// client-library charset. Check both sides before trusting defaults.
+				// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Inspect the active session before trusting an empty charset setting.
+				$session_result = mysqli_query( $dbh, 'SELECT @@character_set_client AS client_charset, @@character_set_connection AS connection_charset' );
+				if ( ! ( $session_result instanceof mysqli_result ) ) {
+					wp_die( 'Unable to verify the database connection charset.' );
+				}
+
+				$session_charsets = mysqli_fetch_assoc( $session_result );
+				mysqli_free_result( $session_result );
+				if ( ! is_array( $session_charsets ) ) {
+					wp_die( 'Unable to read the database connection charset.' );
+				}
+				$charsets = array(
+					mysqli_character_set_name( $dbh ),
+					$session_charsets['client_charset'],
+					$session_charsets['connection_charset'],
+				);
+				foreach ( $charsets as $current_charset ) {
+					$current_charset = strtolower( $current_charset );
+					if ( 'utf8mb3' === $current_charset ) {
+						$current_charset = 'utf8';
+					}
+					if ( ! in_array( $current_charset, self::$allowed_charsets, true ) ) {
+						wp_die( 'The database connection charset is not supported in LudicrousDB for security reasons.' );
+					}
+				}
+				$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $charset, $collate );
+			}
 			return;
 		}
 
@@ -1721,7 +1779,10 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Do the query
-		$this->_do_query( $query, $dbh );
+		$set_names = $this->_do_query( $query, $dbh );
+		if ( $use_defaults && $set_names && $dbh instanceof mysqli ) {
+			$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $charset, $collate );
+		}
 	}
 
 	/**
@@ -2418,6 +2479,9 @@ class LudicrousDB extends wpdb {
 
 		$this->clear_busy_connection_probe( $dbh );
 		$this->release_busy_connection( $dbh );
+		if ( $dbh instanceof mysqli ) {
+			unset( $this->connection_charsets[ spl_object_hash( $dbh ) ] );
+		}
 
 		$already_closed         = false;
 		$previous_error_handler = null;
