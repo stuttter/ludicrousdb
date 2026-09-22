@@ -71,6 +71,44 @@ final class LiveCharsetTest extends TestCase {
 				unset( $dbhname );
 				return false;
 			}
+
+			/**
+			 * Supply wpdb's timer hook for the isolated bootstrap.
+			 */
+			public function timer_start() {}
+
+			/**
+			 * Supply wpdb's elapsed-time hook for the isolated bootstrap.
+			 *
+			 * @return float
+			 */
+			public function timer_stop() {
+				return 0.0;
+			}
+
+			/**
+			 * The live test's database is already known to be reachable.
+			 *
+			 * @param string $host Host name.
+			 * @param int    $port Port number.
+			 * @param float  $float_timeout Timeout in seconds.
+			 * @param string $socket Optional socket path.
+			 * @return bool
+			 */
+			public function check_tcp_responsiveness( $host, $port, $float_timeout, $socket = '' ) {
+				unset( $host, $port, $float_timeout, $socket );
+				return true;
+			}
+
+			/**
+			 * SQL-mode filtering belongs to WordPress, not this isolated test.
+			 *
+			 * @param array $modes Optional SQL modes.
+			 * @param mixed $dbh_or_table Optional connection.
+			 */
+			public function set_sql_mode( $modes = array(), $dbh_or_table = false ) {
+				unset( $modes, $dbh_or_table );
+			}
 		};
 
 		$database->set_charset( $dbh );
@@ -107,6 +145,28 @@ final class LiveCharsetTest extends TestCase {
 		$database->db_connect( false, 'SELECT 1' );
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_character_set_name -- Changed object defaults must refresh the cached link.
 		$this->assertSame( 'utf8mb4', mysqli_character_set_name( $dbh ) );
+
+		// A pending result must survive while routing moves to a fresh handle.
+		$database->charset = '';
+		$database->collate = '';
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Manufacture a busy link for the charset refresh path.
+		$busy_result = mysqli_query( $dbh, 'SELECT 1 UNION ALL SELECT 2', MYSQLI_USE_RESULT );
+		$this->assertInstanceOf( mysqli_result::class, $busy_result );
+		$this->assertFalse( $database->set_charset( $dbh ) );
+		$database->charset = 'latin1';
+		$database->collate = 'latin1_swedish_ci';
+
+		$replacement = $database->db_connect( false, 'SELECT 1' );
+		// phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- The recovery path must return a fresh MySQLi handle.
+		$this->assertInstanceOf( mysqli::class, $replacement );
+		$this->assertNotSame( $dbh, $replacement );
+		$this->assertSame( array( '1' ), $busy_result->fetch_row() );
+		$busy_result->free();
+
+		$dbh = $replacement;
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_character_set_name -- The replacement link receives the changed charset.
+		$this->assertSame( 'latin1', mysqli_character_set_name( $dbh ) );
+
 		$database->charset = '';
 		$database->collate = '';
 

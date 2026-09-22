@@ -38,6 +38,10 @@ final class LudicrousDBTest extends TestCase {
 	 * @preserveGlobalState disabled
 	 */
 	public function test_custom_charset_without_collation_constant() {
+		if ( defined( 'DB_CHARSET' ) ) {
+			$this->markTestSkipped( 'This isolated case requires DB_CHARSET to be absent during bootstrap.' );
+		}
+
 		define( 'DB_CHARSET', 'latin1' );
 
 		$database = new LudicrousDB();
@@ -59,6 +63,34 @@ final class LudicrousDBTest extends TestCase {
 			public $set_charset_calls = 0;
 
 			/**
+			 * Whether the next charset update should fail.
+			 *
+			 * @var bool
+			 */
+			public $fail_charset = false;
+
+			/**
+			 * Number of failed links removed from the cache.
+			 *
+			 * @var int
+			 */
+			public $disconnect_calls = 0;
+
+			/**
+			 * Simulate one stale probe before a successful recovery probe.
+			 *
+			 * @var bool
+			 */
+			public $unavailable_once = false;
+
+			/**
+			 * Count recoveries that retained the same connection.
+			 *
+			 * @var int
+			 */
+			public $check_connection_calls = 0;
+
+			/**
 			 * Count requested charset updates without using the inert test handle.
 			 *
 			 * @param mysqli $dbh     Connection handle.
@@ -68,6 +100,9 @@ final class LudicrousDBTest extends TestCase {
 			public function set_charset( $dbh, $charset = null, $collate = null ) {
 				unset( $dbh, $charset, $collate );
 				++$this->set_charset_calls;
+				if ( $this->fail_charset ) {
+					return false;
+				}
 			}
 
 			/**
@@ -79,6 +114,46 @@ final class LudicrousDBTest extends TestCase {
 			public function should_mysql_ping( $dbhname = '' ) {
 				unset( $dbhname );
 				return false;
+			}
+
+			/**
+			 * Treat the inert handle as available for routing assertions.
+			 *
+			 * @param mysqli $dbh Connection handle.
+			 * @return int
+			 */
+			protected function get_connection_status( $dbh ) {
+				unset( $dbh );
+				if ( $this->unavailable_once ) {
+					$this->unavailable_once = false;
+					return self::CONNECTION_DEAD;
+				}
+				return self::CONNECTION_AVAILABLE;
+			}
+
+			/**
+			 * Simulate a successful second probe on the same handle.
+			 *
+			 * @param bool   $allow_bail Whether bailing is allowed.
+			 * @param mixed  $dbh_or_table Connection to check.
+			 * @param string $query Query used for routing.
+			 * @param mixed  $die_on_disconnect Historical alias.
+			 * @return bool
+			 */
+			public function check_connection( $allow_bail = true, $dbh_or_table = false, $query = '', $die_on_disconnect = null ) {
+				unset( $allow_bail, $dbh_or_table, $query, $die_on_disconnect );
+				++$this->check_connection_calls;
+				return true;
+			}
+
+			/**
+			 * Remove a failed test handle without closing the inert MySQLi object.
+			 *
+			 * @param string $dbhname Connection name.
+			 */
+			public function disconnect( $dbhname ) {
+				++$this->disconnect_calls;
+				unset( $this->dbhs[ $dbhname ] );
 			}
 
 			/**
@@ -114,9 +189,11 @@ final class LudicrousDBTest extends TestCase {
 		$database->db_connect( false, 'SELECT 1' );
 		$this->assertSame( 1, $database->set_charset_calls );
 
-		$database->charset = 'latin1';
-		$database->collate = 'latin1_swedish_ci';
-		$database->db_connect( false, 'SELECT 1' );
+		$database->charset          = 'latin1';
+		$database->collate          = 'latin1_swedish_ci';
+		$database->unavailable_once = true;
+		$this->assertSame( $dbh, $database->db_connect( false, 'SELECT 1' ) );
+		$this->assertSame( 1, $database->check_connection_calls );
 		$this->assertSame( 2, $database->set_charset_calls );
 
 		$database->mark_charset_applied( $dbh );
@@ -124,6 +201,11 @@ final class LudicrousDBTest extends TestCase {
 		$database->collate = '';
 		$database->db_connect( false, 'SELECT 1' );
 		$this->assertSame( 3, $database->set_charset_calls );
+
+		$database->fail_charset = true;
+		$database->charset      = 'utf8';
+		$this->assertFalse( $database->db_connect( false, 'SELECT 1' ) );
+		$this->assertSame( 1, $database->disconnect_calls );
 	}
 
 	/**

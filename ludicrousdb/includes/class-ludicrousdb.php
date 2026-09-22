@@ -607,7 +607,7 @@ class LudicrousDB extends wpdb {
 			$charset = DB_CHARSET;
 
 			// Do not pair a custom charset with the utf8mb4 fallback collation.
-			if ( ! defined( 'DB_COLLATE' ) && 'utf8mb4' !== strtolower( $charset ) ) {
+			if ( ! defined( 'DB_COLLATE' ) && ( ! is_string( $charset ) || 'utf8mb4' !== strtolower( $charset ) ) ) {
 				$collate = '';
 			}
 		}
@@ -1053,13 +1053,30 @@ class LudicrousDB extends wpdb {
 
 			// A drop-in may override these settings after the link was opened.
 			$dbh = $this->dbhs[ $dbhname ];
-			if (
-				$dbh instanceof mysqli
-				&&
-				( ! isset( $this->connection_charsets[ spl_object_hash( $dbh ) ] )
-					|| array( $this->charset, $this->collate ) !== $this->connection_charsets[ spl_object_hash( $dbh ) ] )
-			) {
-				$this->set_charset( $dbh );
+			if ( $dbh instanceof mysqli ) {
+				$charset_key = spl_object_hash( $dbh );
+				if (
+					! isset( $this->connection_charsets[ $charset_key ] )
+					|| array( $this->charset, $this->collate ) !== $this->connection_charsets[ $charset_key ]
+				) {
+					// A charset update cannot use a link with an active result.
+					if ( self::CONNECTION_AVAILABLE !== $this->get_connection_status( $dbh ) ) {
+						if ( ! $this->check_connection( false, $dbh, $query ) ) {
+							return false;
+						}
+
+						// Recovery may have replaced or rerouted the cached handle.
+						if ( ! isset( $this->dbhs[ $dbhname ] ) || $this->dbhs[ $dbhname ] !== $dbh ) {
+							return $this->dbh_type_check( $this->dbh ) ? $this->dbh : false;
+						}
+					}
+
+					$this->dbh = $dbh; // Needed by wpdb::prepare().
+					if ( false === $this->set_charset( $dbh ) ) {
+						$this->disconnect( $dbhname );
+						return false;
+					}
+				}
 			}
 
 			return $this->dbhs[ $dbhname ];
@@ -1370,7 +1387,12 @@ class LudicrousDB extends wpdb {
 		if ( $this->dbhs[ $dbhname ] instanceof mysqli ) {
 			unset( $this->connection_charsets[ spl_object_hash( $this->dbhs[ $dbhname ] ) ] );
 		}
-		$this->set_charset( $this->dbhs[ $dbhname ] );
+		if ( false === $this->set_charset( $this->dbhs[ $dbhname ] ) ) {
+			$this->disconnect( $dbhname );
+			return $allow_bail
+				? $this->bail( 'Unable to verify the database connection charset.' )
+				: false;
+		}
 
 		$this->dbh                      = $this->dbhs[ $dbhname ]; // needed by $wpdb->_real_escape()
 		$this->last_used_server         = compact( 'host', 'user', 'name', 'write', 'read' );
@@ -1723,13 +1745,13 @@ class LudicrousDB extends wpdb {
 				// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Inspect the active session before trusting an empty charset setting.
 				$session_result = mysqli_query( $dbh, 'SELECT @@character_set_client AS client_charset, @@character_set_connection AS connection_charset' );
 				if ( ! ( $session_result instanceof mysqli_result ) ) {
-					wp_die( 'Unable to verify the database connection charset.' );
+					return false;
 				}
 
 				$session_charsets = mysqli_fetch_assoc( $session_result );
 				mysqli_free_result( $session_result );
 				if ( ! is_array( $session_charsets ) ) {
-					wp_die( 'Unable to read the database connection charset.' );
+					return false;
 				}
 				$charsets = array(
 					mysqli_character_set_name( $dbh ),
@@ -1737,7 +1759,7 @@ class LudicrousDB extends wpdb {
 					$session_charsets['connection_charset'],
 				);
 				foreach ( $charsets as $current_charset ) {
-					$current_charset = strtolower( $current_charset );
+					$current_charset = is_string( $current_charset ) ? strtolower( $current_charset ) : '';
 					if ( 'utf8mb3' === $current_charset ) {
 						$current_charset = 'utf8';
 					}
@@ -1767,7 +1789,7 @@ class LudicrousDB extends wpdb {
 
 		// Bail if client charset could not be set
 		if ( false === $do_set_names_query ) {
-			return;
+			return false;
 		}
 
 		// Start the query with charset
@@ -1780,6 +1802,9 @@ class LudicrousDB extends wpdb {
 
 		// Do the query
 		$set_names = $this->_do_query( $query, $dbh );
+		if ( false === $set_names ) {
+			return false;
+		}
 		if ( $set_names && $dbh instanceof mysqli ) {
 			// An explicit per-link override survives until the object defaults change.
 			$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $this->charset, $this->collate );
