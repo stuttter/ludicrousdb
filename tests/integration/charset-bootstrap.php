@@ -101,6 +101,46 @@ if ( 'latin1' !== $configured_after_construction->get_var( 'SELECT @@character_s
 	throw new RuntimeException( 'An empty collation prevented the configured character set.' );
 }
 
+// Explicit settings applied after the first query must reach the existing link.
+$configured_after_construction->charset = 'utf8mb4';
+$configured_after_construction->collate = 'utf8mb4_unicode_ci';
+
+if ( 'utf8mb4' !== $configured_after_construction->get_var( 'SELECT @@character_set_connection' ) ) {
+	throw new RuntimeException( 'A later charset override did not reach the existing connection.' );
+}
+
+if ( 'utf8mb4_unicode_ci' !== $configured_after_construction->get_var( 'SELECT @@collation_connection' ) ) {
+	throw new RuntimeException( 'A later collation override did not reach the existing connection.' );
+}
+
+// A table can have its own collation without changing the connection setting.
+$dbh = $configured_after_construction->dbh;
+if ( ! mysqli_query( $dbh, 'CREATE TEMPORARY TABLE ldb_charset_probe (value varchar(10)) CHARACTER SET latin1 COLLATE latin1_swedish_ci' ) ) {
+	throw new RuntimeException( 'Could not create the table-collation probe.' );
+}
+
+$result = mysqli_query( $dbh, 'SHOW FULL COLUMNS FROM ldb_charset_probe' );
+$column = $result ? mysqli_fetch_assoc( $result ) : false;
+if ( $result ) {
+	mysqli_free_result( $result );
+}
+
+if ( ! $column || 'latin1_swedish_ci' !== $column['Collation'] ) {
+	throw new RuntimeException( 'The table did not retain its declared collation.' );
+}
+
+$result  = mysqli_query( $dbh, 'SELECT @@character_set_connection, @@collation_connection' );
+$session = $result ? mysqli_fetch_row( $result ) : false;
+if ( $result ) {
+	mysqli_free_result( $result );
+}
+
+if ( ! $session || array( 'utf8mb4', 'utf8mb4_unicode_ci' ) !== $session ) {
+	throw new RuntimeException( 'The table collation changed the connection charset or collation.' );
+}
+
+mysqli_query( $dbh, 'DROP TEMPORARY TABLE ldb_charset_probe' );
+
 // Set both host variables to exercise separate read and write servers.
 $primary_host = getenv( 'LDB_TEST_PRIMARY_HOST' );
 $replica_host = getenv( 'LDB_TEST_REPLICA_HOST' );
@@ -128,6 +168,31 @@ if ( $primary_host && $replica_host ) {
 	if ( ! isset( $routed->dbhs['global__r'], $routed->dbhs['global__w'] ) ) {
 		throw new RuntimeException( 'Separate read and write connections were not opened.' );
 	}
+
+	// An override after both links are open must reach each cached connection.
+	$routed->charset = 'latin1';
+	$routed->collate = 'latin1_swedish_ci';
+
+	$routed->send_reads_to_primaries = array();
+	$routed->get_var( 'SELECT 1' );
+	$routed->query( 'SET @ldb_charset_probe = 2' );
+
+	foreach ( array( 'global__r', 'global__w' ) as $name ) {
+		$result = mysqli_query( $routed->dbhs[ $name ], 'SELECT @@character_set_connection, @@collation_connection' );
+		$row    = mysqli_fetch_row( $result );
+		mysqli_free_result( $result );
+
+		if ( array( 'latin1', 'latin1_swedish_ci' ) !== $row ) {
+			throw new RuntimeException( 'A later override did not reach a routed connection.' );
+		}
+	}
+
+	$routed->charset = DB_CHARSET;
+	$routed->collate = '';
+
+	$routed->send_reads_to_primaries = array();
+	$routed->get_var( 'SELECT 1' );
+	$routed->query( 'SET @ldb_charset_probe = 3' );
 
 	$servers = array();
 	foreach ( array( 'global__r', 'global__w' ) as $name ) {

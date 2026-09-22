@@ -178,6 +178,13 @@ class LudicrousDB extends wpdb {
 	public $db_connections = array();
 
 	/**
+	 * Charset and collation last applied to each MySQLi connection.
+	 *
+	 * @var array
+	 */
+	protected $connection_charsets = array();
+
+	/**
 	 * The list of unclosed connections sorted by LRU.
 	 *
 	 * @var array Default empty array.
@@ -960,6 +967,19 @@ class LudicrousDB extends wpdb {
 			// Increment the connection counter
 			$this->increment_db_connection( $conn, 'queries' );
 
+			// A drop-in may override these settings after the link was opened.
+			$dbh = $this->dbhs[ $dbhname ];
+			if (
+				$dbh instanceof mysqli
+				&&
+				! empty( $this->charset )
+				&&
+				( ! isset( $this->connection_charsets[ spl_object_hash( $dbh ) ] )
+					|| array( $this->charset, $this->collate ) !== $this->connection_charsets[ spl_object_hash( $dbh ) ] )
+			) {
+				$this->set_charset( $dbh );
+			}
+
 			return $this->dbhs[ $dbhname ];
 		}
 
@@ -1606,7 +1626,9 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Do the query
-		$this->_do_query( $query, $dbh );
+		if ( $this->_do_query( $query, $dbh ) && $dbh instanceof mysqli ) {
+			$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $charset, $collate );
+		}
 	}
 
 	/**
@@ -2061,6 +2083,9 @@ class LudicrousDB extends wpdb {
 		$closed = mysqli_close( $dbh );
 
 		if ( ! empty( $closed ) ) {
+			if ( $dbh instanceof mysqli ) {
+				unset( $this->connection_charsets[ spl_object_hash( $dbh ) ] );
+			}
 			$this->dbh = null;
 		}
 
