@@ -231,6 +231,17 @@ class LudicrousDB extends wpdb {
 	public $db_connections = array();
 
 	/**
+	 * Object charset and collation last associated with each MySQLi connection.
+	 *
+	 * Cached links can outlive changes to these public properties. Recording the
+	 * settings per link lets db_connect() refresh a changed link without sending
+	 * another charset command or verification query on every reuse.
+	 *
+	 * @var array<string, array{string, string}>
+	 */
+	protected $connection_charsets = array();
+
+	/**
 	 * The list of unclosed connections sorted by LRU.
 	 *
 	 * @var array Default empty array.
@@ -435,11 +446,11 @@ class LudicrousDB extends wpdb {
 		// Start the TCP cache
 		$this->tcp_cache_start();
 
+		// Initialize defaults before applying explicit constructor settings.
+		$this->init_charset();
+
 		// Prepare class vars
 		$this->prepare_class_vars( $dbuser, $dbpassword, $dbname, $dbhost );
-
-		// Initialize charset and collate
-		$this->init_charset();
 	}
 
 	/**
@@ -521,6 +532,22 @@ class LudicrousDB extends wpdb {
 
 		// Only set vars if there are vars to set
 		if ( ! empty( $class_vars ) ) {
+			// A constructor charset override must not retain the previous
+			// charset's collation when no replacement was supplied.
+			if (
+				isset( $class_vars['charset'] )
+				&&
+				! isset( $class_vars['collate'] )
+				&&
+				(
+					! is_string( $class_vars['charset'] )
+					||
+					0 !== strcasecmp( $class_vars['charset'], $this->charset )
+				)
+			) {
+				$class_vars['collate'] = '';
+			}
+
 			$this->set_class_vars( $class_vars );
 		}
 	}
@@ -598,6 +625,11 @@ class LudicrousDB extends wpdb {
 		// Use constant if defined
 		if ( defined( 'DB_CHARSET' ) ) {
 			$charset = DB_CHARSET;
+
+			// Do not pair a custom charset with the utf8mb4 fallback collation.
+			if ( ! defined( 'DB_COLLATE' ) && ( ! is_string( $charset ) || 'utf8mb4' !== strtolower( $charset ) ) ) {
+				$collate = '';
+			}
 		}
 
 		// Determine charset and collate
@@ -1039,7 +1071,7 @@ class LudicrousDB extends wpdb {
 			// Increment the connection counter
 			$this->increment_db_connection( $conn, 'queries' );
 
-			return $this->dbhs[ $dbhname ];
+			return $this->refresh_cached_connection_charset( $dbhname, $query );
 		}
 
 		// Bail if trying to connect to a dead primary
@@ -1343,7 +1375,14 @@ class LudicrousDB extends wpdb {
 			break;
 		} while ( true );
 
-		$this->set_charset( $this->dbhs[ $dbhname ] );
+		// A new link must not inherit a previous object's cached settings.
+		$this->forget_connection_charset( $this->dbhs[ $dbhname ] );
+		if ( false === $this->set_charset( $this->dbhs[ $dbhname ] ) ) {
+			$this->disconnect( $dbhname );
+			return $allow_bail
+				? $this->bail( 'Unable to verify the database connection charset.' )
+				: false;
+		}
 
 		$this->dbh                      = $this->dbhs[ $dbhname ]; // needed by $wpdb->_real_escape()
 		$this->last_used_server         = compact( 'host', 'user', 'name', 'write', 'read' );
@@ -1667,7 +1706,14 @@ class LudicrousDB extends wpdb {
 	}
 
 	/**
-	 * Sets the connection's character set
+	 * Set the connection's character set.
+	 *
+	 * A non-empty charset is applied through MySQLi and SET NAMES. An empty
+	 * effective default leaves the server session alone, so verify its client
+	 * and connection charsets before trusting it. Explicit per-call overrides
+	 * do not change the tracked object defaults. Returns false if the charset
+	 * cannot be applied or the session cannot be inspected; otherwise it has
+	 * no return value.
 	 *
 	 * @since 1.0.0
 	 *
@@ -1676,6 +1722,7 @@ class LudicrousDB extends wpdb {
 	 * @param string          $collate Optional. The collation.
 	 */
 	public function set_charset( $dbh, $charset = null, $collate = null ) {
+		$use_defaults = ( null === $charset && null === $collate );
 
 		// Default charset
 		if ( ! isset( $charset ) ) {
@@ -1687,8 +1734,14 @@ class LudicrousDB extends wpdb {
 			$collate = $this->collate;
 		}
 
-		// Exit if charset is empty
+		// An empty charset leaves the connection at its server default.
 		if ( empty( $charset ) ) {
+			if ( $use_defaults && $dbh instanceof mysqli ) {
+				if ( ! $this->verify_default_connection_charset( $dbh ) ) {
+					return false;
+				}
+				$this->remember_connection_charset( $dbh, $charset, $collate );
+			}
 			return;
 		}
 
@@ -1709,7 +1762,7 @@ class LudicrousDB extends wpdb {
 
 		// Bail if client charset could not be set
 		if ( false === $do_set_names_query ) {
-			return;
+			return false;
 		}
 
 		// Start the query with charset
@@ -1721,7 +1774,166 @@ class LudicrousDB extends wpdb {
 		}
 
 		// Do the query
-		$this->_do_query( $query, $dbh );
+		$set_names = $this->_do_query( $query, $dbh );
+		if ( false === $set_names ) {
+			return false;
+		}
+		if ( $dbh instanceof mysqli ) {
+			// An explicit per-link override survives until the object defaults change.
+			$this->remember_connection_charset( $dbh, $this->charset, $this->collate );
+		}
+	}
+
+	/**
+	 * Check whether a MySQLi link has the current object charset settings.
+	 *
+	 * This compares only the settings recorded for the link; it deliberately
+	 * does not inspect the server on the ordinary cached-query path. An
+	 * out-of-band session change is not detected by this comparison.
+	 *
+	 * @since 5.3.1
+	 *
+	 * @param mysqli $dbh Database connection.
+	 * @return bool Whether the cached settings match.
+	 */
+	private function is_connection_charset_current( $dbh ) {
+		$key = spl_object_hash( $dbh );
+
+		return isset( $this->connection_charsets[ $key ] )
+			&& array( $this->charset, $this->collate ) === $this->connection_charsets[ $key ];
+	}
+
+	/**
+	 * Refresh a cached link when the object's charset settings change.
+	 *
+	 * An unchanged link returns without another database command. A changed
+	 * link is checked for an active result before set_charset() applies or
+	 * verifies the new setting; this avoids interfering with an unbuffered
+	 * result on the old link.
+	 *
+	 * A busy link may be replaced or rerouted by connection recovery, so return
+	 * the connection selected by that path rather than the original handle.
+	 *
+	 * @since 5.3.1
+	 *
+	 * @param string $dbhname Cached connection name.
+	 * @param string $query   Query being routed.
+	 * @return mysqli|resource|false Selected connection, or false on failure.
+	 */
+	private function refresh_cached_connection_charset( $dbhname, $query ) {
+		// A drop-in may override these settings after the link was opened.
+		$dbh = $this->dbhs[ $dbhname ];
+		if ( ! ( $dbh instanceof mysqli ) || $this->is_connection_charset_current( $dbh ) ) {
+			return $dbh;
+		}
+
+		// A charset update cannot use a link with an active result.
+		if ( self::CONNECTION_AVAILABLE !== $this->get_connection_status( $dbh ) ) {
+			if ( ! $this->check_connection( false, $dbh, $query ) ) {
+				return false;
+			}
+
+			// Recovery may have replaced or rerouted the cached handle.
+			if ( ! isset( $this->dbhs[ $dbhname ] ) || $this->dbhs[ $dbhname ] !== $dbh ) {
+				return $this->dbh_type_check( $this->dbh ) ? $this->dbh : false;
+			}
+		}
+
+		$this->dbh = $dbh; // Needed by wpdb::prepare().
+		if ( false === $this->set_charset( $dbh ) ) {
+			$this->disconnect( $dbhname );
+			return false;
+		}
+
+		return $this->dbhs[ $dbhname ];
+	}
+
+	/**
+	 * Remember the object charset settings associated with a MySQLi link.
+	 *
+	 * Explicit per-link overrides record the object's unchanged defaults so the
+	 * override survives reuse until those defaults change. The record is not
+	 * proof of the server's current session charset, especially after later SQL
+	 * or connection callbacks.
+	 *
+	 * @since 5.3.1
+	 *
+	 * @param mysqli $dbh     Database connection.
+	 * @param string $charset Object charset setting to record for this link.
+	 * @param string $collate Object collation setting to record for this link.
+	 * @return void
+	 */
+	private function remember_connection_charset( $dbh, $charset, $collate ) {
+		$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $charset, $collate );
+	}
+
+	/**
+	 * Forget charset settings when a MySQLi link is replaced or closed.
+	 *
+	 * The next link must be configured independently, even if PHP eventually
+	 * reuses an object hash from a closed connection.
+	 *
+	 * @since 5.3.1
+	 *
+	 * @param mysqli|resource $dbh Database connection.
+	 * @return void
+	 */
+	private function forget_connection_charset( $dbh ) {
+		if ( $dbh instanceof mysqli ) {
+			unset( $this->connection_charsets[ spl_object_hash( $dbh ) ] );
+		}
+	}
+
+	/**
+	 * Verify that an unconfigured MySQLi link uses an allowed client and session charset.
+	 *
+	 * An empty effective charset means LudicrousDB does not send SET NAMES.
+	 * mysqli_character_set_name() alone cannot reveal a server-side SET NAMES
+	 * change, so inspect both session charset variables as well. Each observed
+	 * charset must be supported, but the values need not match. This adds one
+	 * SELECT when an empty default is first used on a link or becomes the new
+	 * object setting, not one SELECT per cached query.
+	 *
+	 * @since 5.3.1
+	 *
+	 * @param mysqli $dbh Database connection.
+	 * @return bool Whether the session could be inspected.
+	 */
+	private function verify_default_connection_charset( $dbh ) {
+		// SET NAMES can change the server session without changing MySQLi's
+		// client-library charset. Check both sides before trusting defaults.
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Inspect the active session before trusting an empty charset setting.
+		try {
+			$session_result = mysqli_query( $dbh, 'SELECT @@character_set_client AS client_charset, @@character_set_connection AS connection_charset' );
+		} catch ( Throwable $exception ) {
+			return false;
+		}
+		if ( ! ( $session_result instanceof mysqli_result ) ) {
+			return false;
+		}
+
+		$session_charsets = mysqli_fetch_assoc( $session_result );
+		mysqli_free_result( $session_result );
+		if ( ! is_array( $session_charsets ) ) {
+			return false;
+		}
+
+		$charsets = array(
+			mysqli_character_set_name( $dbh ),
+			$session_charsets['client_charset'],
+			$session_charsets['connection_charset'],
+		);
+		foreach ( $charsets as $current_charset ) {
+			$current_charset = is_string( $current_charset ) ? strtolower( $current_charset ) : '';
+			if ( 'utf8mb3' === $current_charset ) {
+				$current_charset = 'utf8';
+			}
+			if ( ! in_array( $current_charset, self::$allowed_charsets, true ) ) {
+				wp_die( 'The database connection charset is not supported in LudicrousDB for security reasons.' );
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -2418,6 +2630,7 @@ class LudicrousDB extends wpdb {
 
 		$this->clear_busy_connection_probe( $dbh );
 		$this->release_busy_connection( $dbh );
+		$this->forget_connection_charset( $dbh );
 
 		$already_closed         = false;
 		$previous_error_handler = null;

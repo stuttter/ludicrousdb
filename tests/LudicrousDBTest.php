@@ -17,6 +17,208 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Explicit constructor settings take precedence over fallback defaults.
+	 */
+	public function test_constructor_preserves_explicit_character_set() {
+		$database = new LudicrousDB(
+			array(
+				'charset' => 'latin1',
+				'collate' => 'latin1_swedish_ci',
+			)
+		);
+
+		$this->assertSame( 'latin1', $database->charset );
+		$this->assertSame( 'latin1_swedish_ci', $database->collate );
+	}
+
+	/**
+	 * A constructor charset override must not retain another charset's collation.
+	 */
+	public function test_constructor_charset_without_collation_uses_server_default() {
+		$database = new LudicrousDB( array( 'charset' => 'latin1' ) );
+
+		$this->assertSame( 'latin1', $database->charset );
+		$this->assertSame( '', $database->collate );
+	}
+
+	/**
+	 * A custom charset without DB_COLLATE must not inherit the utf8mb4 collation.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_custom_charset_without_collation_constant() {
+		if ( defined( 'DB_CHARSET' ) ) {
+			$this->markTestSkipped( 'This isolated case requires DB_CHARSET to be absent during bootstrap.' );
+		}
+
+		define( 'DB_CHARSET', 'latin1' );
+
+		$database = new LudicrousDB();
+
+		$this->assertSame( 'latin1', $database->charset );
+		$this->assertSame( '', $database->collate );
+	}
+
+	/**
+	 * Cached links receive later charset changes without repeated SET NAMES.
+	 */
+	public function test_cached_connection_refreshes_changed_charset_only() {
+		$database = new class() extends LudicrousDB {
+			/**
+			 * Number of charset updates requested.
+			 *
+			 * @var int
+			 */
+			public $set_charset_calls = 0;
+
+			/**
+			 * Whether the next charset update should fail.
+			 *
+			 * @var bool
+			 */
+			public $fail_charset = false;
+
+			/**
+			 * Number of failed links removed from the cache.
+			 *
+			 * @var int
+			 */
+			public $disconnect_calls = 0;
+
+			/**
+			 * Simulate one stale probe before a successful recovery probe.
+			 *
+			 * @var bool
+			 */
+			public $unavailable_once = false;
+
+			/**
+			 * Count recoveries that retained the same connection.
+			 *
+			 * @var int
+			 */
+			public $check_connection_calls = 0;
+
+			/**
+			 * Count requested charset updates without using the inert test handle.
+			 *
+			 * @param mysqli $dbh     Connection handle.
+			 * @param string $charset Optional charset.
+			 * @param string $collate Optional collation.
+			 */
+			public function set_charset( $dbh, $charset = null, $collate = null ) {
+				unset( $dbh, $charset, $collate );
+				++$this->set_charset_calls;
+				if ( $this->fail_charset ) {
+					return false;
+				}
+			}
+
+			/**
+			 * Keep the test independent of a live server.
+			 *
+			 * @param string $dbhname Connection name.
+			 * @return bool
+			 */
+			public function should_mysql_ping( $dbhname = '' ) {
+				unset( $dbhname );
+				return false;
+			}
+
+			/**
+			 * Treat the inert handle as available for routing assertions.
+			 *
+			 * @param mysqli $dbh Connection handle.
+			 * @return int
+			 */
+			protected function get_connection_status( $dbh ) {
+				unset( $dbh );
+				if ( $this->unavailable_once ) {
+					$this->unavailable_once = false;
+					return self::CONNECTION_DEAD;
+				}
+				return self::CONNECTION_AVAILABLE;
+			}
+
+			/**
+			 * Simulate a successful second probe on the same handle.
+			 *
+			 * @param bool   $allow_bail Whether bailing is allowed.
+			 * @param mixed  $dbh_or_table Connection to check.
+			 * @param string $query Query used for routing.
+			 * @param mixed  $die_on_disconnect Historical alias.
+			 * @return bool
+			 */
+			public function check_connection( $allow_bail = true, $dbh_or_table = false, $query = '', $die_on_disconnect = null ) {
+				unset( $allow_bail, $dbh_or_table, $query, $die_on_disconnect );
+				++$this->check_connection_calls;
+				return true;
+			}
+
+			/**
+			 * Remove a failed test handle without closing the inert MySQLi object.
+			 *
+			 * @param string $dbhname Connection name.
+			 */
+			public function disconnect( $dbhname ) {
+				++$this->disconnect_calls;
+				unset( $this->dbhs[ $dbhname ] );
+			}
+
+			/**
+			 * Record the settings as though they were applied to the connection.
+			 *
+			 * @param mysqli $dbh Connection handle.
+			 */
+			public function mark_charset_applied( $dbh ) {
+				$this->connection_charsets[ spl_object_hash( $dbh ) ] = array( $this->charset, $this->collate );
+			}
+		};
+
+		$database->add_database(
+			array(
+				'host'     => DB_HOST,
+				'user'     => DB_USER,
+				'password' => DB_PASSWORD,
+				'name'     => DB_NAME,
+			)
+		);
+
+		// An inert handle is enough to exercise cached routing without a server.
+		$dbh                                    = mysqli_init(); // phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init
+		$database->dbhs['global__r']            = $dbh;
+		$database->used_servers['global__r']    = array( 'name' => DB_NAME );
+		$database->dbh2host['global__r']        = DB_HOST;
+		$database->db_connections[0]['dbhname'] = 'global__r';
+
+		$this->assertSame( $dbh, $database->db_connect( false, 'SELECT 1' ) );
+		$this->assertSame( 1, $database->set_charset_calls );
+
+		$database->mark_charset_applied( $dbh );
+		$database->db_connect( false, 'SELECT 1' );
+		$this->assertSame( 1, $database->set_charset_calls );
+
+		$database->charset          = 'latin1';
+		$database->collate          = 'latin1_swedish_ci';
+		$database->unavailable_once = true;
+		$this->assertSame( $dbh, $database->db_connect( false, 'SELECT 1' ) );
+		$this->assertSame( 1, $database->check_connection_calls );
+		$this->assertSame( 2, $database->set_charset_calls );
+
+		$database->mark_charset_applied( $dbh );
+		$database->charset = '';
+		$database->collate = '';
+		$database->db_connect( false, 'SELECT 1' );
+		$this->assertSame( 3, $database->set_charset_calls );
+
+		$database->fail_charset = true;
+		$database->charset      = 'utf8';
+		$this->assertFalse( $database->db_connect( false, 'SELECT 1' ) );
+		$this->assertSame( 1, $database->disconnect_calls );
+	}
+
+	/**
 	 * The wpdb-style constructor assigns all four connection properties.
 	 */
 	public function test_constructor_accepts_wpdb_connection_arguments() {
