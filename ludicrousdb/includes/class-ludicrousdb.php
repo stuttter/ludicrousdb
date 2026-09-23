@@ -1720,6 +1720,7 @@ class LudicrousDB extends wpdb {
 	 * @param mysqli|resource $dbh     The resource given by mysqli_real_connect
 	 * @param string          $charset Optional. The character set.
 	 * @param string          $collate Optional. The collation.
+	 * @return false|null False on failure; otherwise no return value.
 	 */
 	public function set_charset( $dbh, $charset = null, $collate = null ) {
 		$use_defaults = ( null === $charset && null === $collate );
@@ -1778,7 +1779,7 @@ class LudicrousDB extends wpdb {
 		if ( false === $set_names ) {
 			return false;
 		}
-		if ( $set_names && $dbh instanceof mysqli ) {
+		if ( $dbh instanceof mysqli ) {
 			// An explicit per-link override survives until the object defaults change.
 			$this->remember_connection_charset( $dbh, $this->charset, $this->collate );
 		}
@@ -1859,8 +1860,8 @@ class LudicrousDB extends wpdb {
 	 * @since 5.3.1
 	 *
 	 * @param mysqli $dbh     Database connection.
-	 * @param string $charset Charset applied to the connection.
-	 * @param string $collate Collation applied to the connection.
+	 * @param string $charset Object charset setting to record for this link.
+	 * @param string $collate Object collation setting to record for this link.
 	 * @return void
 	 */
 	private function remember_connection_charset( $dbh, $charset, $collate ) {
@@ -1903,7 +1904,11 @@ class LudicrousDB extends wpdb {
 		// SET NAMES can change the server session without changing MySQLi's
 		// client-library charset. Check both sides before trusting defaults.
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_query -- Inspect the active session before trusting an empty charset setting.
-		$session_result = mysqli_query( $dbh, 'SELECT @@character_set_client AS client_charset, @@character_set_connection AS connection_charset' );
+		try {
+			$session_result = mysqli_query( $dbh, 'SELECT @@character_set_client AS client_charset, @@character_set_connection AS connection_charset' );
+		} catch ( Throwable $exception ) {
+			return false;
+		}
 		if ( ! ( $session_result instanceof mysqli_result ) ) {
 			return false;
 		}

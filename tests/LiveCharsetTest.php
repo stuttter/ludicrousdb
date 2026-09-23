@@ -48,6 +48,29 @@ final class LiveCharsetTest extends TestCase {
 		// phpcs:ignore PHPCompatibility.Classes.NewAnonymousClasses.Found -- LudicrousDB requires PHP 7.4 or newer.
 		$database = new class() extends LudicrousDB {
 			/**
+			 * Count charset commands while mimicking a void-returning subclass override.
+			 *
+			 * @var int
+			 */
+			public $set_names_calls = 0;
+
+			/**
+			 * Return false only on failure, as a subclass may do with wpdb's void contract.
+			 *
+			 * @param string $query SQL statement.
+			 * @param mixed  $dbh_or_table Optional connection.
+			 * @return false|void False on failure; otherwise no return value.
+			 */
+			protected function _do_query( $query, $dbh_or_table = false ) { // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore -- Match the inherited method name.
+				if ( 0 === stripos( $query, 'SET NAMES ' ) ) {
+					++$this->set_names_calls;
+				}
+				if ( false === parent::_do_query( $query, $dbh_or_table ) ) {
+					return false;
+				}
+			}
+
+			/**
 			 * Quote the two static SET NAMES arguments without a WordPress bootstrap.
 			 *
 			 * @param string $query SQL with placeholders.
@@ -152,6 +175,9 @@ final class LiveCharsetTest extends TestCase {
 		$database->db_connect( false, 'SELECT 1' );
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_character_set_name -- Changed object defaults must refresh the cached link.
 		$this->assertSame( 'utf8mb4', mysqli_character_set_name( $dbh ) );
+		$set_names_before = $database->set_names_calls;
+		$this->assertSame( $dbh, $database->db_connect( false, 'SELECT 1' ) );
+		$this->assertSame( $set_names_before, $database->set_names_calls, 'Cached reuse must not repeat SET NAMES after a void-returning override.' );
 
 		// Empty settings need one session check when they change, not another
 		// SELECT every time a normal query reuses the cached connection.
@@ -192,6 +218,21 @@ final class LiveCharsetTest extends TestCase {
 		$dbh = $replacement;
 		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_character_set_name -- The replacement link receives the changed charset.
 		$this->assertSame( 'latin1', mysqli_character_set_name( $dbh ) );
+		// A public call may inherit strict MySQLi reporting from its caller.
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_connect -- Create a separate handle for the strict-mode failure check.
+		$closed_dbh = mysqli_connect( $parts[0], getenv( 'LDB_TEST_DB_USER' ), getenv( 'LDB_TEST_DB_PASSWORD' ), getenv( 'LDB_TEST_DB_NAME' ), $port );
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_close -- Deliberately invalidate the separate test handle.
+		mysqli_close( $closed_dbh );
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_report -- Exercise strict mode, then restore the normal reporting mode.
+		mysqli_report( MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT );
+		try {
+			$database->charset = '';
+			$database->collate = '';
+			$this->assertFalse( $database->set_charset( $closed_dbh ) );
+		} finally {
+			// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_report -- Restore the normal LudicrousDB reporting mode.
+			mysqli_report( MYSQLI_REPORT_OFF );
+		}
 
 		$database->charset = '';
 		$database->collate = '';
