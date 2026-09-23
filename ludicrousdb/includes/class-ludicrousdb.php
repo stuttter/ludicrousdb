@@ -1720,7 +1720,6 @@ class LudicrousDB extends wpdb {
 	 * @param mysqli|resource $dbh     The resource given by mysqli_real_connect
 	 * @param string          $charset Optional. The character set.
 	 * @param string          $collate Optional. The collation.
-	 * @return false|null False on failure; otherwise no return value.
 	 */
 	public function set_charset( $dbh, $charset = null, $collate = null ) {
 		$use_defaults = ( null === $charset && null === $collate );
