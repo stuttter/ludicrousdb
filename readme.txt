@@ -85,7 +85,7 @@ Since LudicrousDB attempts a connection only when a query is made, your WordPres
 = 5.3.1 =
 * Preserve explicit charset and collation settings during initialization.
 * Leave collation unspecified when a custom DB_CHARSET has no DB_COLLATE, allowing the server's compatible default.
-* New: cached connections adopt later charset and collation changes without adding a charset query to ordinary reuse.
+* Cached connections adopt later charset and collation changes without adding a charset query to ordinary reuse.
 * Check client and server session charsets once per link when the effective charset is empty, rejecting unsupported defaults.
 * Improve connection recovery and preserve active MySQLi results during busy-connection probes.
 

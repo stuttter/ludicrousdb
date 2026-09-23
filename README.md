@@ -42,11 +42,12 @@ charset causes a one-time connection check and how to avoid that read-back,
 see the [character sets and collations wiki page](https://github.com/stuttter/ludicrousdb/wiki/Character-Sets-and-Collations).
 
 Since 5.3.1, a cached connection adopts later changes to `$wpdb->charset` or
-`$wpdb->collate` without repeating charset commands on ordinary queries. An
-empty effective charset instead keeps the server default and validates its
-session charsets once when the link is configured; set a supported, non-empty
-effective charset to avoid that read-back query. The wiki page explains the
-precedence of constants and `db-config.php` assignments.
+`$wpdb->collate` the next time it is used. Reuse with unchanged settings sends
+no charset query. An empty effective charset instead keeps the server default
+and validates its session charsets once when the link is configured, rejecting
+unsupported defaults. Set a supported, non-empty effective charset to avoid
+that read-back query. The wiki page explains the precedence of constants and
+`db-config.php` assignments.
 
 ### Sample Configuration 1: Default Server
 
