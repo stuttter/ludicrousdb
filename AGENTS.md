@@ -23,9 +23,10 @@
 
 ## Releases
 
-Keep the plugin headers, readme stable tag, changelog, Git tag, GitHub release,
-and WordPress.org version synchronized. Database drop-in changes require an
-explicit release decision.
+Keep the plugin headers, readme stable tag, changelog, Git tag, and GitHub
+release synchronized. LudicrousDB is distributed from GitHub; do not publish
+it to WordPress.org. Database drop-in changes require an explicit release
+decision.
 
 ## Automation
 
