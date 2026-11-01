@@ -368,6 +368,133 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Dataset callbacks can override the initial connection query count.
+	 *
+	 * @param mixed $override Callback-provided query count.
+	 * @param int   $expected Expected connection query count.
+	 *
+	 * @dataProvider callback_query_count_provider
+	 */
+	public function test_db_connect_preserves_callback_query_count( $override, $expected ) {
+		// phpcs:ignore PHPCompatibility.Classes.NewAnonymousClasses.Found -- The supported minimum is PHP 7.4.
+		$database = new class() extends LudicrousDB {
+			/**
+			 * Create an inert handle without contacting a database server.
+			 *
+			 * @param string $dbhname Database handle name.
+			 * @param string $host Database host.
+			 * @param string $user Database user.
+			 * @param string $password Database password.
+			 * @return mysqli
+			 */
+			protected function single_db_connect( $dbhname, $host, $user, $password ) {
+				unset( $host, $user, $password );
+				$this->dbhs[ $dbhname ] = mysqli_init(); // phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init
+
+				return $this->dbhs[ $dbhname ];
+			}
+
+			/**
+			 * Keep the test independent of a live database.
+			 *
+			 * @param string $host Host name.
+			 * @param int    $port Port number.
+			 * @param float  $float_timeout Timeout in seconds.
+			 * @param string $socket Optional socket path.
+			 * @return bool
+			 */
+			public function check_tcp_responsiveness( $host, $port, $float_timeout, $socket = '' ) {
+				unset( $host, $port, $float_timeout, $socket );
+
+				return true;
+			}
+
+			/**
+			 * Supply wpdb's timer hook for the isolated bootstrap.
+			 */
+			public function timer_start() {}
+
+			/**
+			 * Supply wpdb's elapsed-time hook for the isolated bootstrap.
+			 *
+			 * @return float
+			 */
+			public function timer_stop() {
+				return 0.0;
+			}
+
+			/**
+			 * Treat the configured database as selected.
+			 *
+			 * @param string $db Database name.
+			 * @param mixed  $dbh Optional database handle.
+			 * @param mixed  $dbh_or_table Historical database handle alias.
+			 * @return bool
+			 */
+			public function select( $db, $dbh = null, $dbh_or_table = null ) {
+				unset( $db, $dbh, $dbh_or_table );
+
+				return true;
+			}
+
+			/**
+			 * Skip SQL mode setup for the inert handle.
+			 *
+			 * @param array $modes Optional SQL modes.
+			 * @param mixed $dbh_or_table Optional database handle.
+			 */
+			public function set_sql_mode( $modes = array(), $dbh_or_table = false ) {
+				unset( $modes, $dbh_or_table );
+			}
+
+			/**
+			 * Skip charset setup for the inert handle.
+			 *
+			 * @param mysqli $dbh Database handle.
+			 * @param string $charset Optional charset.
+			 * @param string $collate Optional collation.
+			 */
+			public function set_charset( $dbh, $charset = null, $collate = null ) {
+				unset( $dbh, $charset, $collate );
+			}
+		};
+
+		$database->add_database(
+			array(
+				'host'     => DB_HOST,
+				'user'     => DB_USER,
+				'password' => DB_PASSWORD,
+				'name'     => DB_NAME,
+			)
+		);
+		$database->add_callback(
+			function () use ( $override ) {
+				return array(
+					'dataset' => 'global',
+					'queries' => $override,
+				);
+			}
+		);
+
+		$dbh = $database->db_connect( false, 'SELECT * FROM wp_posts' );
+
+		$this->assertInstanceOf( mysqli::class, $dbh ); // phpcs:ignore WordPress.DB.RestrictedClasses.mysql__mysqli -- Assert the inert handle created by the test double.
+		$this->assertSame( $expected, $database->last_connection['queries'] );
+	}
+
+	/**
+	 * Callback-provided connection query counts.
+	 *
+	 * @return array
+	 */
+	public function callback_query_count_provider() {
+		return array(
+			'override'      => array( 7, 7 ),
+			'null fallback' => array( null, 1 ),
+		);
+	}
+
+	/**
 	 * Normal queries retain LudicrousDB's historical fatal-handling behavior.
 	 */
 	public function test_query_allows_connection_failure_to_bail() {
