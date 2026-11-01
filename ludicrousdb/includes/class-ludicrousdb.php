@@ -863,6 +863,7 @@ class LudicrousDB extends wpdb {
 			$this->table = 'no-table';
 		}
 		$this->last_table = $this->table;
+		$queries          = 1;
 
 		// Use current table with no callback results
 		if ( isset( $this->ludicrous_tables[ $this->table ] ) ) {
@@ -878,7 +879,25 @@ class LudicrousDB extends wpdb {
 			// Set if not null
 			if ( ! is_null( $this->callback_result ) ) {
 				if ( is_array( $this->callback_result ) ) {
-					extract( $this->callback_result, EXTR_OVERWRITE );
+					$callback_variables = $this->callback_result;
+					if ( array_key_exists( 'queries', $callback_variables ) ) {
+						$queries = isset( $callback_variables['queries'] )
+							? $callback_variables['queries']
+							: 1;
+						unset( $callback_variables['queries'] );
+					}
+					if (
+						isset( $callback_variables['server'] )
+						&&
+						is_array( $callback_variables['server'] )
+						&&
+						array_key_exists( 'queries', $callback_variables['server'] )
+						&&
+						is_null( $callback_variables['server']['queries'] )
+					) {
+						$callback_variables['server']['queries'] = 1;
+					}
+					extract( $callback_variables, EXTR_OVERWRITE );
 				} else {
 					$dataset = $this->callback_result;
 				}
@@ -1281,9 +1300,7 @@ class LudicrousDB extends wpdb {
 							$this->current_host         = $host_and_port;
 							$this->dbh2host[ $dbhname ] = $host_and_port;
 
-							// Define these to avoid undefined variable notices
-							$queries = isset( $queries ) ? $queries : 1; // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UndefinedVariable
-							$lag     = isset( $this->lag ) ? $this->lag : 0;
+							$lag = isset( $this->lag ) ? $this->lag : 0;
 
 							$this->last_connection    = compact( 'dbhname', 'host', 'port', 'socket', 'user', 'name', 'tcp', 'elapsed', 'success', 'queries', 'lag' );
 							$this->db_connections[]   = $this->last_connection;
