@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1a7addbb4c8f1aa449def700b0f7509a",
+    "content-hash": "1e4ea0e22b958341cda29f67ccc11cf2",
     "packages": [
         {
             "name": "composer/installers",
@@ -322,16 +322,16 @@
         },
         {
             "name": "johnbillion/wp-compat",
-            "version": "2.0.1",
+            "version": "3.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/johnbillion/wp-compat.git",
-                "reference": "b2e32bd91716a98bc6fc527c525b979652a4a567"
+                "reference": "5bc1ad5c9c953f89271de607c7e3a8de8589371c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/johnbillion/wp-compat/zipball/b2e32bd91716a98bc6fc527c525b979652a4a567",
-                "reference": "b2e32bd91716a98bc6fc527c525b979652a4a567",
+                "url": "https://api.github.com/repos/johnbillion/wp-compat/zipball/5bc1ad5c9c953f89271de607c7e3a8de8589371c",
+                "reference": "5bc1ad5c9c953f89271de607c7e3a8de8589371c",
                 "shasum": ""
             },
             "require": {
@@ -393,7 +393,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-08-29T17:12:02+00:00"
+            "time": "2026-10-21T20:54:48+00:00"
         },
         {
             "name": "myclabs/deep-copy",
@@ -1072,11 +1072,11 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "2.2.16",
+            "version": "2.3.4",
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/46a6d9060e5a7763adfcc21ebcb8b504ebdbcb92",
-                "reference": "46a6d9060e5a7763adfcc21ebcb8b504ebdbcb92",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/f20ce6f3c82556cfcfc086b152445a12d1d64fff",
+                "reference": "f20ce6f3c82556cfcfc086b152445a12d1d64fff",
                 "shasum": ""
             },
             "require": {
@@ -1132,7 +1132,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-09-25T09:31:51+00:00"
+            "time": "2026-10-28T22:38:53+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
