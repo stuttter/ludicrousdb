@@ -1026,6 +1026,85 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Locking reads use a writable connection while ordinary reads use a replica.
+	 */
+	public function test_locking_reads_route_to_writable_connection() {
+		// phpcs:ignore PHPCompatibility.Classes.NewAnonymousClasses.Found -- The supported minimum is PHP 7.4.
+		$database = new class() extends LudicrousDB {
+			/**
+			 * Treat inert test handles as available.
+			 *
+			 * @param mysqli $dbh Database handle.
+			 * @return int
+			 */
+			protected function get_connection_status( $dbh ) {
+				unset( $dbh );
+
+				return self::CONNECTION_AVAILABLE;
+			}
+
+			/**
+			 * Keep cached inert handles on the routing-only path.
+			 *
+			 * @param string $dbhname Connection name.
+			 * @return bool
+			 */
+			public function should_mysql_ping( $dbhname = '' ) {
+				unset( $dbhname );
+
+				return false;
+			}
+
+			/**
+			 * Skip charset setup for inert test handles.
+			 *
+			 * @param mysqli $dbh Database handle.
+			 * @param string $charset Optional charset.
+			 * @param string $collate Optional collation.
+			 */
+			public function set_charset( $dbh, $charset = null, $collate = null ) {
+				unset( $dbh, $charset, $collate );
+			}
+		};
+
+		$database->add_database(
+			array(
+				'host'     => DB_HOST,
+				'user'     => DB_USER,
+				'password' => DB_PASSWORD,
+				'name'     => DB_NAME,
+				'read'     => 1,
+				'write'    => 1,
+			)
+		);
+
+		// Inert handles are sufficient because the cached routing path does not query them.
+		$read_dbh  = mysqli_init(); // phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init
+		$write_dbh = mysqli_init(); // phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_init
+		foreach ( array(
+			'global__r' => $read_dbh,
+			'global__w' => $write_dbh,
+		) as $dbhname => $dbh ) {
+			$database->dbhs[ $dbhname ]         = $dbh;
+			$database->used_servers[ $dbhname ] = array( 'name' => DB_NAME );
+			$database->dbh2host[ $dbhname ]     = DB_HOST;
+			$database->db_connections[]         = array( 'dbhname' => $dbhname );
+		}
+
+		$this->assertSame( $read_dbh, $database->db_connect( false, 'SELECT * FROM wp_posts' ) );
+		$this->assertSame( 'global__r', $database->dbhname );
+		$this->assertSame( $write_dbh, $database->db_connect( false, 'SELECT * FROM wp_posts FOR SHARE' ) );
+		$this->assertSame( 'global__w', $database->dbhname );
+		$this->assertSame( $write_dbh, $database->db_connect( false, 'SELECT * FROM wp_posts' ) );
+		$this->assertSame( 'global__w', $database->dbhname );
+
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_close -- Close test-only inert handles.
+		mysqli_close( $read_dbh );
+		// phpcs:ignore WordPress.DB.RestrictedFunctions.mysql_mysqli_close -- Close test-only inert handles.
+		mysqli_close( $write_dbh );
+	}
+
+	/**
 	 * Read-only and mutating statements route consistently.
 	 *
 	 * @param string $query    SQL statement.
@@ -1040,17 +1119,89 @@ final class LudicrousDBTest extends TestCase {
 	}
 
 	/**
+	 * Repeated keyword candidates do not make locking-read detection quadratic.
+	 */
+	public function test_locking_read_detection_is_linear() {
+		$database = new LudicrousDB();
+		$started  = microtime( true );
+		$queries  = array(
+			"SELECT '" . str_repeat( 'FOR review ', 50000 ) . "e'",
+			'SELECT ' . str_repeat( '1 FOR review ', 50000 ) . '1',
+			'SELECT ' . str_repeat( '1 LOCK review ', 50000 ) . '1',
+			'SELECT ' . str_repeat( 'post_format, wp_block, ', 25000 ) . '1',
+		);
+
+		foreach ( $queries as $query ) {
+			$this->assertFalse( $database->is_write_query( $query ) );
+			$this->assertSame( PREG_NO_ERROR, preg_last_error() );
+		}
+
+		$this->assertLessThan( 2.0, microtime( true ) - $started );
+	}
+
+	/**
 	 * Provide representative read and write statements.
 	 *
 	 * @return array
 	 */
 	public function query_routing_provider() {
 		return array(
-			'select'                => array( 'SELECT * FROM wp_posts', false ),
-			'select for update'     => array( 'SELECT * FROM wp_posts FOR UPDATE', true ),
-			'common table select'   => array( '( SELECT * FROM wp_posts )', false ),
-			'insert'                => array( 'INSERT INTO wp_posts VALUES ( 1 )', true ),
-			'session configuration' => array( 'SET SESSION sql_mode = ""', true ),
+			'select'                    => array( 'SELECT * FROM wp_posts', false ),
+			'keyword substrings'        => array( 'SELECT post_format, wp_block FROM wp_posts', false ),
+			'select for update'         => array( 'SELECT * FROM wp_posts FOR UPDATE', true ),
+			'select for share'          => array( 'SELECT * FROM wp_posts FOR SHARE', true ),
+			'lock in share mode'        => array( 'SELECT * FROM wp_posts LOCK IN SHARE MODE', true ),
+			'locking read modifier'     => array( 'SELECT * FROM wp_posts FOR UPDATE SKIP LOCKED', true ),
+			'update lock semicolon'     => array( 'SELECT * FROM wp_posts FOR UPDATE;', true ),
+			'share lock semicolon'      => array( 'SELECT * FROM wp_posts FOR SHARE;', true ),
+			'share mode semicolon'      => array( 'SELECT * FROM wp_posts LOCK IN SHARE MODE;', true ),
+			'adjacent lock comment'     => array( 'SELECT * FROM wp_posts FOR SHARE/* wait */', true ),
+			'lock after comment'        => array( 'SELECT * FROM wp_posts/* route */FOR SHARE', true ),
+			'lock after parenthesis'    => array( 'SELECT * FROM wp_posts WHERE ID IN ( 1 )FOR SHARE', true ),
+			'lock after quoted value'   => array( "SELECT * FROM wp_posts WHERE post_title = 'draft'LOCK IN SHARE MODE", true ),
+			'comment within update'     => array( 'SELECT * FROM wp_posts FOR/* route */UPDATE', true ),
+			'comment within share'      => array( "SELECT * FROM wp_posts FOR -- route\nSHARE", true ),
+			'comment within share mode' => array( 'SELECT * FROM wp_posts LOCK IN/**/SHARE MODE', true ),
+			'versioned update lock'     => array( 'SELECT * FROM wp_posts /*!50000FOR UPDATE*/', true ),
+			'versioned share keyword'   => array( 'SELECT * FROM wp_posts FOR /*!50000 SHARE */', true ),
+			'versioned update keyword'  => array( 'SELECT * FROM wp_posts FOR/*!50000UPDATE*/', true ),
+			'versioned for keyword'     => array( 'SELECT * FROM wp_posts /*!50000FOR*/ SHARE', true ),
+			'versioned share mode'      => array( 'SELECT * FROM wp_posts LOCK IN /*!50000 SHARE*/ MODE', true ),
+			'mariadb share keyword'     => array( 'SELECT * FROM wp_posts FOR/*M!SHARE*/', true ),
+			'mariadb versioned share'   => array( 'SELECT * FROM wp_posts FOR /*M!100000 SHARE */', true ),
+			'mariadb update keyword'    => array( 'SELECT * FROM wp_posts FOR/*M!UPDATE*/', true ),
+			'quoted block before lock'  => array( "SELECT '/*' AS marker FROM wp_posts FOR/* route */SHARE", true ),
+			'quoted line before lock'   => array( "SELECT '--' AS marker FROM wp_posts LOCK/**/IN SHARE MODE", true ),
+			'backslash escaped quote'   => array( "SELECT 'x\\' y' AS marker FROM wp_posts FOR/* route */SHARE", true ),
+			'no backslash escapes'      => array( "SELECT 'x\\' AS marker FROM wp_posts FOR/* route */SHARE", true ),
+			'double minus expression'   => array( 'SELECT 1--1 AS n FROM wp_posts FOR SHARE', true ),
+			'backslash in identifier'   => array( "SELECT 1 AS `\\`, '`#', 'x\\'#' FROM t FOR SHARE", true ),
+			'ansi quoted identifier'    => array( "SELECT 1 AS \"\\\", '\"#', 'x\\'#' FROM t FOR SHARE", true ),
+			'del line comment'          => array( "SELECT 1 --\x7f '\n, '#' FROM t FOR SHARE", true ),
+			'close before comment'      => array( 'SELECT */* # */ FROM wp_posts FOR SHARE', true ),
+			'operator before comment'   => array( 'SELECT 2*/*#*/3 FROM wp_posts LOCK IN SHARE MODE', true ),
+			'quote inside comment'      => array( "SELECT */* '*/ FROM wp_posts FOR/**/SHARE", true ),
+			'hash comment carriage'     => array( "SELECT * # \r/*\nFROM wp_posts FOR SHARE", true ),
+			'dash comment carriage'     => array( "SELECT * -- x\r/*\nFROM wp_posts FOR SHARE", true ),
+			'nested version comment'    => array( 'SELECT 1 /*! /*!50000 # */ */ FROM wp_posts FOR SHARE', true ),
+			'skipped mysql hash'        => array( 'SELECT * FROM wp_posts /*!99999 # */ FOR SHARE', true ),
+			'skipped mysql dash'        => array( 'SELECT * FROM wp_posts /*!99999 -- */ FOR SHARE', true ),
+			'skipped mariadb hash'      => array( 'SELECT * FROM wp_posts /*M!999999 # */ LOCK IN SHARE MODE', true ),
+			'mixed version gates'       => array( "SELECT 1 /*!50000 , '*/ # ' */ /*!99999 # */ FROM t FOR SHARE", true ),
+			'multibyte trail escape'    => array( "SELECT '\x83\\', '#', 'x\\'#' FROM t FOR SHARE", true ),
+			'quoted value before lock'  => array( "SELECT * FROM wp_posts WHERE post_title = 'draft' FOR UPDATE", true ),
+			'null before lock'          => array( 'SELECT * FROM wp_posts WHERE ID <=> \NLOCK IN SHARE MODE', true ),
+			'null before update'        => array( 'SELECT * FROM wp_posts WHERE ID <=> \NFOR UPDATE;', true ),
+			'decimal before lock'       => array( 'SELECT * FROM wp_posts WHERE ID = 1.0LOCK IN SHARE MODE', true ),
+			'decimal before share'      => array( 'SELECT * FROM wp_posts WHERE ID = 1.5FOR SHARE', true ),
+			'exponent before share'     => array( 'SELECT * FROM wp_posts WHERE ID > 1.5e3FOR SHARE', true ),
+			'decimal before update'     => array( 'SELECT * FROM wp_posts WHERE ID = 1.5FOR UPDATE;', true ),
+			'optimizer hint quote'      => array( 'SELECT /*+ QB_NAME(`*/#`) */ * FROM t FOR SHARE', true ),
+			'quote after update lock'   => array( "SELECT * FROM wp_posts FOR UPDATE /* don't wait */", true ),
+			'quote after share lock'    => array( "SELECT * FROM wp_posts FOR SHARE /* don't wait */", true ),
+			'common table select'       => array( '( SELECT * FROM wp_posts )', false ),
+			'insert'                    => array( 'INSERT INTO wp_posts VALUES ( 1 )', true ),
+			'session configuration'     => array( 'SET SESSION sql_mode = ""', true ),
 		);
 	}
 }

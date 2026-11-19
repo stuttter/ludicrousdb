@@ -716,12 +716,34 @@ class LudicrousDB extends wpdb {
 		$q = ltrim( $q, "\r\n\t (" );
 
 		// Possible writes
-		if ( preg_match( '/(?:^|\s)(?:ALTER|CREATE|ANALYZE|CHECK|OPTIMIZE|REPAIR|CALL|DELETE|DROP|INSERT|LOAD|REPLACE|UPDATE|FOR\s+UPDATE|SET|RENAME\s+TABLE|[a-z]+_LOCKS?\()(?:\s|$)/i', $q ) ) {
+		if ( preg_match( '/(?:^|\s)(?:ALTER|CREATE|ANALYZE|CHECK|OPTIMIZE|REPAIR|CALL|DELETE|DROP|INSERT|LOAD|REPLACE|UPDATE|SET|RENAME\s+TABLE|[a-z]+_LOCKS?\()(?:\s|$)/i', $q ) ) {
 			return true;
 		}
 
-		// Not possible non-writes (phew!)
-		return ! preg_match( '/^(?:SELECT|SHOW|DESCRIBE|DESC|EXPLAIN)(?:\s|$)/i', $q );
+		// Not a possible non-write (phew!)
+		if ( ! preg_match( '/^(?:SELECT|SHOW|DESCRIBE|DESC|EXPLAIN)(?:\s|$)/i', $q ) ) {
+			return true;
+		}
+
+		// Most reads do not need the locking-clause scan.
+		if ( false === stripos( $q, 'FOR' ) && false === stripos( $q, 'LOCK' ) ) {
+			return false;
+		}
+
+		// Avoid scanning common identifiers that only contain the keyword text.
+		if ( 0 === preg_match( '~(?:(?<![A-Z_$])(?:FOR|LOCK)|\\\\N(?:FOR|LOCK))(?![A-Z0-9_$])~i', $q ) ) {
+			return false;
+		}
+
+		// Comments can separate keywords, and their exact execution depends on context.
+		if ( false !== strpos( $q, '/*' ) || false !== strpos( $q, '--' ) || false !== strpos( $q, '#' ) ) {
+			return true;
+		}
+
+		// Locking reads must use a writable server.
+		$locking_read_pattern = '~(?:FOR\s++(?:UPDATE|SHARE)|LOCK\s++IN\s++SHARE\s++MODE)\b~i';
+
+		return 0 !== preg_match( $locking_read_pattern, $q );
 	}
 
 	/**
